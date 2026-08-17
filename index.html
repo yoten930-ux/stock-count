@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 離線防護與強制同步版</title>
+    <title>SFM 完整盤點系統 - 相機高相容穩定版</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -345,6 +345,7 @@
         <div class="modal-container" style="background: white; padding: 15px;">
             <h3 id="cameraModalTitle" style="margin-top:0; color:#0058a3;">掃描條碼</h3>
             <p id="cameraModalSubtitle" style="font-size:12px; color:#666; margin-top:-5px;">將鏡頭對準條碼即可自動讀取...</p>
+            <!-- 確保相機容器寬度 100% -->
             <div id="reader" style="width:100%; max-width:400px; margin:auto;"></div>
             <button class="btn btn-danger" style="margin-top:15px;" onclick="stopCameraScanner()">🛑 關閉相機</button>
         </div>
@@ -417,7 +418,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-    // 🔑 補上 Firebase 資料庫專屬網址 databaseURL
     const firebaseConfig = {
         apiKey: "AIzaSyC4Yu58CX40ybgNeHB-HepYxLga1bIYZpA",
         authDomain: "stock-count-744d9.firebaseapp.com",
@@ -459,7 +459,6 @@
 
     let sharedAudioCtx = null;
 
-    // 🛡️ 離線優先防護：網頁載入時立刻拉取本機資料顯示
     window.addEventListener('DOMContentLoaded', () => {
         loadPersistedDataLocalOnly();
         updateUI();
@@ -552,14 +551,31 @@
         const syncDot = document.querySelector('.sync-dot'); const syncText = document.getElementById('syncText');
         syncText.innerText = "同步中..."; syncDot.style.backgroundColor = "#ff9800";
 
-        return set(ref(db, 'sfm_inventory_sync'), {
+        let isResolved = false;
+
+        const syncPromise = set(ref(db, 'sfm_inventory_sync'), {
             currentInventoryMonth, zoneDepartments, productDatabase, knownZones: [...knownZones], scannedItems, zoneStatus, systemStartTime
-        }).then(() => {
+        });
+
+        syncPromise.then(() => {
+            isResolved = true;
             syncText.innerText = "已與雲端同步"; syncDot.style.backgroundColor = "#4CAF50";
             setTimeout(() => { if (navigator.onLine) syncText.innerText = "即時連線中"; }, 2000);
         }).catch((error) => {
-            syncText.innerText = "⚠️ 同步失敗 (已存本機)"; syncDot.style.backgroundColor = "#f44336";
+            isResolved = true;
+            syncText.innerText = "⚠️ 同步被拒絕 (權限或網址錯誤)"; syncDot.style.backgroundColor = "#f44336";
+            console.error("Firebase sync error:", error);
+            alert("雲端同步失敗！請檢查 Firebase 資料庫的「規則 (Rules)」是否已設定為 true。");
         });
+
+        setTimeout(() => {
+            if (!isResolved) {
+                syncText.innerText = "⚠️ 連線逾時 (請檢查防火牆設定)";
+                syncDot.style.backgroundColor = "#ff9800";
+            }
+        }, 5000);
+
+        return syncPromise;
     }
 
     window.generateUUID = function() {
@@ -1139,61 +1155,75 @@
         }
     }
 
-    window.startCameraScanner = async function(mode) {
+    // 🚀 核心升級：修正相機啟動流程，給予 DOM 渲染緩衝時間
+    window.startCameraScanner = function(mode) {
         scanMode = mode;
         const modal = document.getElementById('cameraModal');
-        
+
+        // 如果相機已經在運作，先把它關閉再重啟
         if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
-            await html5QrcodeScanner.stop(); html5QrcodeScanner.clear();
+            html5QrcodeScanner.stop().then(() => {
+                html5QrcodeScanner.clear();
+                initScanner();
+            }).catch(() => { initScanner(); });
+        } else {
+            initScanner();
         }
 
-        modal.classList.remove('hidden');
-        document.getElementById('cameraModalTitle').innerText = mode === 'create' ? "掃描新增商品" : `以掃代打 (${currentCountMode === 'initial' ? '累加初盤' : '覆核比對'})`;
-        document.getElementById('cameraModalSubtitle').innerText = mode === 'create' ? "將加入盤單清單中" : "鏡頭對準條碼，自動執行動作";
+        function initScanner() {
+            modal.classList.remove('hidden');
+            document.getElementById('cameraModalTitle').innerText = mode === 'create' ? "掃描新增商品" : `以掃代打 (${currentCountMode === 'initial' ? '累加初盤' : '覆核比對'})`;
+            document.getElementById('cameraModalSubtitle').innerText = mode === 'create' ? "將加入盤單清單中" : "鏡頭對準條碼，自動執行動作";
 
-        // === 🚀 核心升級：強制連續對焦與硬體加速 ===
-        html5QrcodeScanner = new Html5Qrcode("reader");
-        
-        // 優先嘗試最高效能配置
-        html5QrcodeScanner.start(
-            { facingMode: "environment", focusMode: "continuous" }, 
-            { 
-                fps: 30, // 提升幀率
-                qrbox: function(viewfinderWidth, viewfinderHeight) {
-                    // 📏 動態擴大掃描框寬度，完美包覆 1D 條碼
-                    return { width: Math.floor(viewfinderWidth * 0.9), height: 150 };
-                },
-                useBarCodeDetectorIfSupported: true, // 調用手機硬體 AI 掃描引擎
-                formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A ] 
-            }, 
-            (txt) => { 
-                if (window.isVerifying) return; 
-                if (txt === lastScanCode && (Date.now() - lastScanTime) < 1500) return;
-                lastScanCode = txt; lastScanTime = Date.now(); window.playBeep();
-                if (scanMode === 'create') { document.getElementById('itemCodeInput').value = txt; window.processScan(); } 
-                else if (scanMode === 'count') { window.processCountScan(txt); }
-            }, 
-            () => {}
-        ).catch(() => { 
-            // 🛡️ 防護機制：如果舊手機不支援連續對焦，自動降級啟動
-            html5QrcodeScanner.start(
-                { facingMode: "environment" }, 
-                { fps: 15, qrbox: function(vw, vh) { return { width: Math.floor(vw * 0.9), height: 150 }; } }, 
-                (txt) => { 
-                    if (window.isVerifying) return; 
-                    if (txt === lastScanCode && (Date.now() - lastScanTime) < 1500) return;
-                    lastScanCode = txt; lastScanTime = Date.now(); window.playBeep();
-                    if (scanMode === 'create') { document.getElementById('itemCodeInput').value = txt; window.processScan(); } 
-                    else if (scanMode === 'count') { window.processCountScan(txt); }
-                }, 
-                () => {}
-            ).catch(() => { alert("無法開啟相機。請確認權限或連線安全性。"); window.stopCameraScanner(); });
-        });
+            // ⚠️ 關鍵修復：等待 300ms 讓 Modal 完整展開，確保能正確計算掃描框的寬度
+            setTimeout(() => {
+                html5QrcodeScanner = new Html5Qrcode("reader");
+                
+                // 使用最穩定、相容性最高的設定
+                const config = {
+                    fps: 15, 
+                    qrbox: function(viewfinderWidth, viewfinderHeight) {
+                        // 確保掃描框寬度至少有 250px，避免寬度為 0 導致當機
+                        const boxWidth = Math.max(250, Math.floor(viewfinderWidth * 0.8));
+                        return { width: boxWidth, height: 150 };
+                    },
+                    aspectRatio: 1.0,
+                    formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A ]
+                };
+
+                html5QrcodeScanner.start(
+                    { facingMode: "environment" }, // 使用預設後鏡頭，拿掉高風險的 focusMode
+                    config, 
+                    (txt) => { 
+                        if (window.isVerifying) return; 
+                        if (txt === lastScanCode && (Date.now() - lastScanTime) < 1500) return;
+                        lastScanCode = txt; lastScanTime = Date.now(); window.playBeep();
+                        if (scanMode === 'create') { document.getElementById('itemCodeInput').value = txt; window.processScan(); } 
+                        else if (scanMode === 'count') { window.processCountScan(txt); }
+                    }, 
+                    undefined // 忽略掃描過程中的一般 frame 報錯
+                ).catch((err) => { 
+                    console.error("相機啟動失敗:", err);
+                    alert("⚠️ 無法開啟相機！\n請確認：\n1. 瀏覽器已允許相機權限。\n2. 手機沒有被其他程式佔用相機。"); 
+                    window.stopCameraScanner(); 
+                });
+            }, 300);
+        }
     }
 
+    // 確保關閉相機時能把記憶體清乾淨
     window.stopCameraScanner = function() { 
-        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) { html5QrcodeScanner.stop().then(() => { document.getElementById('cameraModal').classList.add('hidden'); }); } 
-        else { document.getElementById('cameraModal').classList.add('hidden'); }
+        const modal = document.getElementById('cameraModal');
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) { 
+            html5QrcodeScanner.stop().then(() => { 
+                html5QrcodeScanner.clear();
+                modal.classList.add('hidden'); 
+            }).catch(() => {
+                modal.classList.add('hidden');
+            }); 
+        } else { 
+            modal.classList.add('hidden'); 
+        }
     }
 
     window.calculateVerifyDiff = function() {
