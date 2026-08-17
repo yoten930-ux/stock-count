@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 快速簽名版</title>
+    <title>SFM 完整盤點系統 - 極速掃描效能版</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -116,7 +116,7 @@
             
             <button class="home-menu-btn" style="border-color: #2196F3;" onclick="switchTab('dashboard')">
                 <h3 style="color: #2196F3;">📊 總覽儀表板 (店長視角)</h3>
-                <p>一頁掌握全館各區盤點進度與待辦事項</p>
+                <p>一頁掌握全館進度、異常商品與預估結束時間</p>
             </button>
 
             <button class="home-menu-btn" style="border-color: #4CAF50;" onclick="exportToExcel()">
@@ -293,6 +293,7 @@
                     <span id="dashZoneStats">已驗收 0 / 0 區</span>
                     <span id="dashItemStats">已盤 0 / 0 項</span>
                 </div>
+                <!-- 預估剩餘時間 -->
                 <div id="dashETA" style="margin-top: 10px; font-size: 14px; font-weight: bold; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
                     ⏳ 預估剩餘時間：系統計算中...
                 </div>
@@ -369,7 +370,7 @@
         </div>
     </div>
 
-    <!-- 簽名畫布彈窗 (新增快速套用區塊) -->
+    <!-- 簽名畫布彈窗 -->
     <div id="signatureModal" class="modal-overlay hidden" style="z-index: 1200;">
         <div class="modal-container">
             <h3>請在下方簽名以核准</h3>
@@ -380,14 +381,14 @@
                 <button class="btn btn-primary" style="flex:2;" onclick="saveSignature()">確認送出</button>
             </div>
             
-            <!-- 新增：預設簽名快速套用區塊 -->
+            <!-- 快速套用區塊 -->
             <div id="defaultSignatureSection" class="hidden" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc;">
                 <p style="font-size:12px; color:#666; margin:0 0 5px 0;">快速套用個人簽名：</p>
                 <button class="btn btn-outline" style="width: 100%; border-style: dashed; padding: 10px;" onclick="useDefaultSignature()">🔏 一鍵套用預設簽名</button>
             </div>
             
             <div style="display:flex; gap:10px; margin-top:10px;">
-                <button class="btn btn-success" style="flex:1; padding: 10px; font-size: 14px;" onclick="saveAsDefaultSignature()">💾 存為預設簽名</button>
+                <button class="btn btn-success" style="flex:1; padding: 10px; font-size: 14px;" onclick="saveAsDefaultSignature()">💾 存為預設</button>
                 <button class="btn btn-danger" style="flex:1; padding: 10px; font-size: 14px;" onclick="closeSignaturePad()">取消 (放棄)</button>
             </div>
         </div>
@@ -829,12 +830,7 @@
         const randomItems = itemsInZone.filter(i => i.isRandomChecked);
         const allRandomsDone = randomItems.length === 0 || randomItems.every(i => i.randomDone);
         const zStat = zoneStatus[z] || {}; const hasAllSigns = !!zStat.sign_zoneInitial && !!zStat.sign_zoneRecount && !!zStat.sign_zoneRandom;
-        
-        if (allItemsCounted && allRecountsDone && allRandomsDone && hasAllSigns) {
-            if (!zoneStatus[z].completedAt) { zoneStatus[z].completedAt = Date.now(); syncToFirebase(); }
-            return true;
-        }
-        return false;
+        return allItemsCounted && allRecountsDone && allRandomsDone && hasAllSigns;
     }
 
     window.updateModeUI = function() {
@@ -1500,10 +1496,10 @@
     canvas.addEventListener('touchstart', handleStart, {passive:false}); canvas.addEventListener('touchmove', handleMove, {passive:false}); canvas.addEventListener('touchend', handleEnd);
     window.clearCanvas = function() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
     
+    // UI: 加入預設簽名的邏輯
     window.openSignaturePad = function(targetId, contextType = 'item') { 
         currentSignContext = { type: contextType, targetId: targetId }; document.getElementById('signatureModal').classList.remove('hidden'); window.resizeCanvas(); window.clearCanvas(); 
         
-        // 檢查是否有預設簽名
         const savedSig = localStorage.getItem('ikea_default_signature');
         if (savedSig) {
             document.getElementById('defaultSignatureSection').classList.remove('hidden');
@@ -1512,7 +1508,6 @@
         }
     }
 
-    // 核心新增：一鍵套用預設簽名
     window.useDefaultSignature = function() {
         const savedSig = localStorage.getItem('ikea_default_signature');
         if (savedSig) {
@@ -1530,14 +1525,7 @@
     }
     
     window.saveSignature = function() { window.applySignature(canvas.toDataURL()); window.closeSignaturePad(); }
-    
-    window.saveAsDefaultSignature = function() { 
-        const dataUrl = canvas.toDataURL(); 
-        localStorage.setItem('ikea_default_signature', dataUrl); 
-        alert("已存為個人預設簽名！(此設定只保留於本裝置)"); 
-        window.applySignature(dataUrl); 
-        window.closeSignaturePad(); 
-    }
+    window.saveAsDefaultSignature = function() { const dataUrl = canvas.toDataURL(); localStorage.setItem('ikea_default_signature', dataUrl); alert("已存為個人預設簽名！(此設定只保留於本裝置)"); window.applySignature(dataUrl); window.closeSignaturePad(); }
     
     window.applySignature = function(imgData) { 
         if (currentSignContext.type === 'item') {
