@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 智慧分類引擎版</title>
+    <title>SFM 完整盤點系統 - 嚴格盲盤與快取優化版</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -104,6 +104,19 @@
             <div class="header" style="margin-bottom: 20px; font-size: 26px;">
                 📦 <span class="display-month" onclick="window.changeMonth()" style="cursor:pointer; text-decoration:underline; color:#ff9800;" title="點擊修改盤點月份"></span> 盤點系統
             </div>
+
+            <!-- 系統進階設定 (實名制與盲盤) -->
+            <div class="input-group" style="background-color: #f9f9f9; border: 2px dashed #ccc;">
+                <label style="color:#0058a3;">⚙️ 系統進階設定</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px;">
+                    <span style="font-size: 14px;">👤 目前操作員：<strong id="displayOperatorName" style="color:#e91e63;">未設定</strong></span>
+                    <button class="btn btn-outline" style="width: auto; padding: 6px 12px; margin: 0; font-size: 12px;" onclick="window.setOperatorName()">變更</button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="blindCountToggle" style="width: auto; transform: scale(1.3);" onchange="window.toggleBlindCount()">
+                    <label for="blindCountToggle" style="margin: 0; cursor: pointer; font-size: 14px; color: #333;">開啟「盲盤模式」(覆核時隱藏初盤紀錄)</label>
+                </div>
+            </div>
             
             <button class="home-menu-btn" onclick="switchTab('create')">
                 <h3>📋 製作盤單</h3>
@@ -134,7 +147,6 @@
                 </button>
             </div>
 
-            <!-- 清空資料按鈕 -->
             <button class="home-menu-btn" style="border-color: #f44336;" onclick="clearAllCurrentData()">
                 <h3 style="color: #f44336;">🗑️ 重新開始 (清空目前盤單)</h3>
                 <p>一鍵清空測試資料與所有進度 (不影響歷史紀錄)</p>
@@ -169,14 +181,13 @@
             <div class="input-group">
                 <label>第二步：快速建立或切換盤點區域</label>
                 <div class="quick-zone-builder">
-                    <!-- 動態快捷鍵容器 -->
                     <div class="category-tabs" id="quickZoneCategories">
                         <button class="cat-tab" onclick="selectQuickZonePrefix('自訂')" style="background-color: #fff3cd; color: #856404; border-color: #ffeeba;">✍️ 自訂</button>
                     </div>
                     <div class="quick-zone-row">
                         <input type="text" id="quickZonePrefix" placeholder="前綴" style="width:25%; background:#eee; text-align:center;" readonly>
                         <span style="font-weight:bold;">+</span>
-                        <input type="number" min="0" id="quickZoneSuffix" placeholder="號碼" style="width:35%;" onkeyup="updateFinalZone()" onchange="updateFinalZone()">
+                        <input type="number" inputmode="numeric" min="0" id="quickZoneSuffix" placeholder="號碼" style="width:35%;" onkeyup="updateFinalZone()" onchange="updateFinalZone()">
                         <span style="font-weight:bold;">=</span>
                         <input type="text" id="zoneInput" placeholder="最終盤區" style="width:40%; background:#e8f5e9; font-weight:bold; color:#2e7d32;" readonly onkeyup="updateCustomZone()">
                     </div>
@@ -356,7 +367,10 @@
         <div class="modal-container" style="background: white; padding: 20px; text-align: center;">
             <h3 style="margin-top:0; color:#0058a3;">🔍 盤點數量覆核</h3>
             <p style="font-size: 14px; color: #333;">商品：<strong id="verifyScanName"></strong></p>
-            <p style="font-size: 14px; color: #666;">系統初盤紀錄：<strong id="verifyScanExpected" style="font-size: 18px; color: #0058a3;"></strong></p>
+            
+            <div id="verifyScanExpectedWrapper">
+                <p style="font-size: 14px; color: #666;">系統初盤紀錄：<strong id="verifyScanExpected" style="font-size: 18px; color: #0058a3;"></strong></p>
+            </div>
             
             <label style="display: block; margin-top: 15px; margin-bottom: 5px; font-weight: bold;">請輸入本次清點數量：</label>
             <input type="number" inputmode="decimal" min="0" step="any" id="verifyScanActual" placeholder="輸入實際數量" oninput="window.calculateVerifyDiff()" style="width:100%; padding:10px; border:2px solid #ccc; border-radius:4px; font-size:18px; text-align:center; margin-bottom:10px;">
@@ -459,10 +473,77 @@
 
     let sharedAudioCtx = null;
 
+    let currentUser = localStorage.getItem('ikea_operator_id') || '';
+    let isBlindCountMode = localStorage.getItem('ikea_blind_count') === 'true';
+
+    // === ⚡ 效能升級：O(1) 分類快取引擎 ===
+    window.zoneCategoryCache = {};
+    window.buildZoneCategoryCache = function() {
+        window.zoneCategoryCache = {};
+        const deptZonesAll = [...knownZones].filter(z => (zoneDepartments[z] || 'SFM') === currentDepartment);
+        
+        let prefixCounts = {};
+        deptZonesAll.forEach(z => {
+            const m = z.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)/);
+            if(m && m[1]) {
+                const p = m[1].toUpperCase();
+                prefixCounts[p] = (prefixCounts[p] || 0) + 1;
+            }
+        });
+
+        deptZonesAll.forEach(z => {
+            const match = z.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)/);
+            if (!match || !match[1]) {
+                window.zoneCategoryCache[z] = '其他';
+                return;
+            }
+            const prefix = match[1].toUpperCase();
+            const numMatch = z.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)(\d+)/);
+            
+            if (prefixCounts[prefix] > 30 && numMatch && numMatch[2]) {
+                const num = parseInt(numMatch[2], 10);
+                const chunk = Math.ceil(num / 30) || 1;
+                const start = (chunk - 1) * 30 + 1;
+                const end = chunk * 30;
+                window.zoneCategoryCache[z] = `${prefix} (${start}-${end})`;
+            } else {
+                window.zoneCategoryCache[z] = prefix;
+            }
+        });
+    }
+
+    window.getZoneCategory = function(zoneName) {
+        return window.zoneCategoryCache[zoneName] || '其他'; 
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
         loadPersistedDataLocalOnly();
+        window.buildZoneCategoryCache(); // 載入後建立快取
         updateUI();
+        document.getElementById('blindCountToggle').checked = isBlindCountMode;
+        if (currentUser) {
+            document.getElementById('displayOperatorName').innerText = currentUser;
+        } else {
+            setTimeout(window.setOperatorName, 800);
+        }
     });
+
+    window.setOperatorName = function() {
+        const op = prompt("請輸入您的「工號或姓名」\n(此資訊將用於盤點稽核的職責分離紀錄)：", currentUser);
+        if (op && op.trim() !== "") {
+            currentUser = op.trim();
+            localStorage.setItem('ikea_operator_id', currentUser);
+            document.getElementById('displayOperatorName').innerText = currentUser;
+        } else if (!currentUser) {
+            alert("⚠️ 為了稽核完整性，請務必設定操作員名稱！");
+        }
+    }
+
+    window.toggleBlindCount = function() {
+        isBlindCountMode = document.getElementById('blindCountToggle').checked;
+        localStorage.setItem('ikea_blind_count', isBlindCountMode);
+        if (currentActiveZone) window.renderZoneItems();
+    }
 
     const connectedRef = ref(db, ".info/connected");
     onValue(connectedRef, (snap) => {
@@ -487,6 +568,7 @@
             zoneStatus = data.zoneStatus || {};
             systemStartTime = data.systemStartTime || null;
             savePersistedDataLocalOnly();
+            window.buildZoneCategoryCache(); // 雲端資料回來時重建快取
             updateUI();
         } else {
             if (scannedItems.length > 0 || knownZones.size > 0) syncToFirebase(); 
@@ -512,7 +594,6 @@
                 if (currentActiveZone) { window.renderZoneItems(); window.renderZoneSignatures(); } else { window.renderZoneDashboard(); }
             }
             if (!document.getElementById('tab-dashboard').classList.contains('hidden')) { window.renderDashboard(); }
-            // 確保一開始就能顯示第二步按鈕
             if (!document.getElementById('tab-create').classList.contains('hidden')) { window.renderQuickZoneButtons(); }
         }
     }
@@ -614,11 +695,11 @@
     }
     window.updateHeaderMonth = function() { document.querySelectorAll('.display-month').forEach(el => el.innerText = currentInventoryMonth); }
 
-    // 部門切換邏輯 (隔離防線)
     window.setDepartment = function(dept) {
         currentDepartment = dept;
         document.querySelectorAll('.dept-btn').forEach(btn => { btn.classList.toggle('active', btn.dataset.dept === dept); });
-        window.renderQuickZoneButtons(); // 切換部門時，重繪第二步的快捷鍵
+        window.buildZoneCategoryCache(); // 換部門重建快取
+        window.renderQuickZoneButtons(); 
         window.renderZoneChecklist(); 
         window.renderCreateListTable(); 
         window.renderZoneDashboard();
@@ -657,6 +738,7 @@
                     systemStartTime = importedData.systemStartTime || null;
 
                     document.getElementById('syncText').innerText = "系統還原中...";
+                    window.buildZoneCategoryCache();
                     await syncToFirebase();
                     await set(ref(db, 'sfm_inventory_history'), inventoryHistory);
                     alert("✅ 完整備份還原成功！"); window.location.reload();
@@ -684,53 +766,18 @@
         if (tab === 'home') { window.stopCameraScanner(); }
     }
 
-    // === 🧠 核心升級一：共用的分類擷取器 (支援拆分邏輯) ===
-    window.getZoneCategory = function(zoneName, deptZonesArray = []) {
-        if (!zoneName) return '其他'; 
-        
-        // 嚴格抓取：最前面的英文、中文或「數字+樓」
-        const match = zoneName.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)/);
-        if (!match || !match[1]) return '其他';
-        
-        const prefix = match[1].toUpperCase();
-        
-        // 如果傳入了當前部門的盤區陣列，我們來計算是否需要拆分
-        if (deptZonesArray.length > 0) {
-            // 計算這個字首的盤區有幾個
-            const prefixCount = deptZonesArray.filter(z => {
-                const m = z.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)/);
-                return m && m[1].toUpperCase() === prefix;
-            }).length;
-
-            // 若數量大於 30 且目前的盤區有帶數字後綴，進行拆分
-            const numMatch = zoneName.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)(\d+)/);
-            if (prefixCount > 30 && numMatch && numMatch[2]) {
-                const num = parseInt(numMatch[2], 10);
-                const chunk = Math.ceil(num / 30) || 1;
-                const start = (chunk - 1) * 30 + 1;
-                const end = chunk * 30;
-                return `${prefix} (${start}-${end})`;
-            }
-        }
-        
-        return prefix; // 如果不滿 30 個，或是沒有帶數字，直接回傳純字首
-    }
-
-    // === 🎯 核心升級二：確保第二步按鈕與第四步完全同步 ===
     window.renderQuickZoneButtons = function() {
         const container = document.getElementById('quickZoneCategories');
         if (!container) return;
         
-        // 只抓出屬於目前部門 (餐廳 or 超市) 的盤區
-        const deptZones = [...knownZones].filter(z => (zoneDepartments[z] || 'SFM') === currentDepartment);
+        const deptZonesAll = [...knownZones].filter(z => (zoneDepartments[z] || 'SFM') === currentDepartment);
         
         const categories = new Set();
-        deptZones.forEach(z => categories.add(window.getZoneCategory(z, deptZones)));
+        deptZonesAll.forEach(z => categories.add(window.getZoneCategory(z)));
         
         let html = '';
         [...categories].sort().forEach(cat => {
             if(cat !== '其他' && cat !== 'SETTING') {
-                // 為了讓點擊後 input 只填入 'SFM' 而不是 'SFM (1-30)'
                 const basePrefix = cat.split(' ')[0]; 
                 html += `<button class="cat-tab" onclick="selectQuickZonePrefix('${basePrefix}', this)">${cat}</button>`;
             }
@@ -745,9 +792,8 @@
         if (zonesArray.length === 0) { container.innerHTML = ""; return; }
         
         const categories = new Set(['全部']); 
-        zonesArray.forEach(z => categories.add(window.getZoneCategory(z, zonesArray)));
+        zonesArray.forEach(z => categories.add(window.getZoneCategory(z)));
         
-        // 確保 '全部' 永遠在最前面
         const sortedCategories = [...categories].sort((a, b) => {
             if (a === '全部') return -1;
             if (b === '全部') return 1;
@@ -767,20 +813,16 @@
     window.jumpToZone = function(zoneName) {
         document.getElementById('zoneInput').value = zoneName; let prefix = '自訂'; let suffix = '';
         
-        // 🔄 配合乾淨按鈕：反向拆解完整盤區名稱
         const match = zoneName.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)(\d*)(.*)$/);
         if (match && match[1]) {
             prefix = match[1].toUpperCase();
-            suffix = match[2]; // 只把數字丟進號碼框
+            suffix = match[2]; 
         } else {
             prefix = zoneName;
         }
 
-        // 計算這個盤區隸屬於哪個分類標籤 (例如 SFM (1-30))
-        const deptZones = [...knownZones].filter(z => (zoneDepartments[z] || 'SFM') === currentDepartment);
-        const categoryName = window.getZoneCategory(zoneName, deptZones);
+        const categoryName = window.getZoneCategory(zoneName);
 
-        // 切換上方對應的按鈕狀態 (找符合類別名稱，或是底層前綴的按鈕)
         document.querySelectorAll('#quickZoneCategories .cat-tab').forEach(btn => { 
             btn.classList.toggle('active', btn.innerText === categoryName || btn.innerText === prefix); 
         });
@@ -800,7 +842,6 @@
         document.getElementById('zoneSpecificTableContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    // 選擇動態捷徑按鈕
     window.selectQuickZonePrefix = function(prefix, btnElement) {
         document.querySelectorAll('#quickZoneCategories .cat-tab').forEach(btn => { 
             btn.classList.remove('active');
@@ -822,7 +863,6 @@
         window.renderCreateListTable(); 
     }
 
-    // === 💡 核心升級三：模糊比對自動補齊 (Fuzzy Smart Match) ===
     window.updateFinalZone = function() {
         const prefix = document.getElementById('quickZonePrefix').value; 
         let suffix = document.getElementById('quickZoneSuffix').value;
@@ -833,21 +873,26 @@
             let padded3 = suffix.padStart(3, '0');
             let padded2 = suffix.padStart(2, '0');
             
-            // 建立可能的字首組合 (例如：BIS013, BIS13)
             let possiblePrefixes = [
                 prefix + padded3, 
                 prefix + padded2, 
                 prefix + suffix   
             ];
 
-            // 嚴格在「目前部門」的盤區中尋找，避免跨部門污染
-            const deptZones = [...knownZones].filter(z => (zoneDepartments[z] || 'SFM') === currentDepartment);
-            let matchedZone = deptZones.find(z => possiblePrefixes.some(p => z.startsWith(p)));
+            const deptZonesAll = [...knownZones].filter(z => (zoneDepartments[z] || 'SFM') === currentDepartment);
+            
+            let matchedZone = deptZonesAll.find(z => possiblePrefixes.includes(z));
+
+            if (!matchedZone) {
+                matchedZone = deptZonesAll.find(z => possiblePrefixes.some(p => {
+                    const regex = new RegExp("^" + p + "[\\(\\[\\ {（]");
+                    return regex.test(z);
+                }));
+            }
 
             if (matchedZone) {
-                finalZoneName = matchedZone; // 找到就直接套用完整名稱 (包含括號備註)
+                finalZoneName = matchedZone; 
             } else {
-                // 找不到的話，如果是數字就預設幫他補 3 碼
                 if (!isNaN(suffix) && !['收貨區', '4樓'].includes(prefix)) {
                     finalZoneName = prefix + padded3;
                 } else {
@@ -880,7 +925,7 @@
             else { statusContainer.innerHTML = `<div class="overall-status overall-pending">⏳ 盤單製作未完成 (本部門已確認 ${readyZonesCount}/${zonesArray.length} 區)</div>`; }
         } else { statusContainer.innerHTML = ""; }
 
-        let filteredZones = activeChecklistCategory !== '全部' ? zonesArray.filter(z => window.getZoneCategory(z, zonesArray) === activeChecklistCategory) : zonesArray;
+        let filteredZones = activeChecklistCategory !== '全部' ? zonesArray.filter(z => window.getZoneCategory(z) === activeChecklistCategory) : zonesArray;
         if (filteredZones.length === 0) { container.innerHTML = `<p style='color:#666; font-size:14px;'>在此分類下無盤區資料。</p>`; return; }
 
         let html = '<table class="checklist-table"><thead><tr><th>盤區名稱</th><th>目前狀態</th><th>操作</th></tr></thead><tbody>';
@@ -965,7 +1010,7 @@
             else { statusContainer.innerHTML = `<div class="overall-status overall-pending">⏳ 本部門盤點進行中 (已驗收 ${finishedZonesCount}/${activeZonesArray.length} 區)</div>`; }
         } else { statusContainer.innerHTML = ""; }
 
-        let filteredZones = activeDashboardCategory !== '全部' ? activeZonesArray.filter(z => window.getZoneCategory(z, activeZonesArray) === activeDashboardCategory) : activeZonesArray;
+        let filteredZones = activeDashboardCategory !== '全部' ? activeZonesArray.filter(z => window.getZoneCategory(z) === activeDashboardCategory) : activeZonesArray;
         if (filteredZones.length === 0) { container.innerHTML = `<p style='text-align:center; color:#666;'>此分類下目前沒有需盤點的區域。</p>`; return; }
 
         container.innerHTML = "";
@@ -981,6 +1026,7 @@
         });
     }
 
+    // === 📊 匯出資料獨立的實名制紀錄欄位 ===
     window.exportToExcel = function() {
         if (scannedItems.length === 0) { alert("目前沒有盤點資料可供匯出！"); return; }
         
@@ -1020,6 +1066,9 @@
             return {
                 "部門": deptName, "盤區": item.zone, "貨號": item.code, "品名": item.name, "單位": item.unit,
                 "初盤數量": initialQtyStr, "更正次數": (item.correctionHistory ? item.correctionHistory.length : 0),
+                "初盤人員": item.initialOperator || "未紀錄", 
+                "覆盤負責人": item.recountOperator || "未紀錄",
+                "抽盤負責人": item.randomOperator || "未紀錄",
                 "抽盤對象": item.isRandomChecked ? "是" : "否",
                 "盤區初盤簽核": zStat.sign_zoneInitial ? "已簽" : "未簽", "盤區覆盤簽核": zStat.sign_zoneRecount ? "已簽" : "未簽", "盤區抽盤簽核": zStat.sign_zoneRandom ? "已簽" : "未簽"
             };
@@ -1042,7 +1091,7 @@
                     zoneDepartments: JSON.parse(JSON.stringify(zoneDepartments))
                 });
 
-                scannedItems = []; systemStartTime = null;
+                scannedItems = []; systemStartTime = null; window.buildZoneCategoryCache();
                 for(let z in zoneStatus) { zoneStatus[z] = { isSkipped: false, sign_zoneInitial: null, sign_zoneRecount: null, sign_zoneRandom: null }; }
                 
                 set(ref(db, 'sfm_inventory_history'), inventoryHistory).then(()=>{
@@ -1164,6 +1213,7 @@
                     }
                 }
             });
+            window.buildZoneCategoryCache();
             window.renderQuickZoneButtons(); 
             syncToFirebase(); 
             let msg = `✅ Excel 匯入成功！\n- 盤區已加入【${currentDepartment === 'REST' ? 'IKEA 餐廳' : '超市與美食小站'}】。`;
@@ -1177,7 +1227,7 @@
         const codeInput = document.getElementById('itemCodeInput'); const code = codeInput.value.trim(); const zone = document.getElementById('zoneInput').value.trim();
         if (!zone) { alert("請先在第二步建立或確認『盤點區域』！"); return; }
         if (!code) return;
-        knownZones.add(zone); window.renderQuickZoneButtons();
+        knownZones.add(zone); window.buildZoneCategoryCache(); window.renderQuickZoneButtons();
         if(!zoneDepartments[zone]) zoneDepartments[zone] = currentDepartment; 
         if (productDatabase[code]) { window.addToInventoryList(code, productDatabase[code].name, productDatabase[code].unit, zone); codeInput.value = ""; } 
         else { document.getElementById('manualAddSection').classList.remove('hidden'); document.getElementById('manualCode').value = code; }
@@ -1270,9 +1320,16 @@
         }
     }
 
+    // === 🙈 核心升級：盲盤模式隱藏即時差異計算 ===
     window.calculateVerifyDiff = function() {
-        const actualInput = document.getElementById('verifyScanActual').value;
         const diffEl = document.getElementById('verifyScanDiff');
+        
+        if (isBlindCountMode) { 
+            diffEl.innerText = ''; 
+            return; 
+        } 
+        
+        const actualInput = document.getElementById('verifyScanActual').value;
         if (actualInput === '') { diffEl.innerText = ''; return; }
         
         const actualQty = parseFloat(actualInput);
@@ -1298,6 +1355,7 @@
         if (item) {
             if (currentCountMode === 'initial') {
                 item.initialQty = (parseFloat(item.initialQty) || 0) + 1; 
+                item.initialOperator = currentUser;
                 if (!systemStartTime) systemStartTime = Date.now();
                 syncToFirebase(); window.renderZoneItems();
             } else if (currentCountMode === 'recount' || currentCountMode === 'random') {
@@ -1310,7 +1368,15 @@
                 
                 window.isVerifying = true; window.verifyItemId = item.id;
                 document.getElementById('verifyScanName').innerText = item.name;
-                document.getElementById('verifyScanExpected').innerText = item.initialQty;
+                
+                if (isBlindCountMode) {
+                    document.getElementById('verifyScanExpectedWrapper').classList.add('hidden');
+                    document.getElementById('verifyScanExpected').innerText = 0; 
+                } else {
+                    document.getElementById('verifyScanExpectedWrapper').classList.remove('hidden');
+                    document.getElementById('verifyScanExpected').innerText = item.initialQty;
+                }
+
                 document.getElementById('verifyScanActual').value = '';
                 document.getElementById('verifyScanDiff').innerText = ''; 
                 document.getElementById('verifyScanModal').classList.remove('hidden');
@@ -1318,7 +1384,7 @@
         } else {
             if (currentCountMode !== 'initial') { alert("⚠️ 覆盤/抽盤模式下，掃描到不在清單內的商品！請切換回初盤模式新增。"); return; }
             if (productDatabase[code]) {
-                scannedItems.push({ id: window.generateUUID(), code: code, name: productDatabase[code].name, unit: productDatabase[code].unit, zone: currentActiveZone, initialQty: 1, isRandomChecked: false, recountDone: false, randomDone: false, correctionHistory: [] });
+                scannedItems.push({ id: window.generateUUID(), code: code, name: productDatabase[code].name, unit: productDatabase[code].unit, zone: currentActiveZone, initialQty: 1, initialOperator: currentUser, isRandomChecked: false, recountDone: false, randomDone: false, correctionHistory: [] });
                 if (!systemStartTime) systemStartTime = Date.now();
                 syncToFirebase(); window.renderZoneItems();
             } else {
@@ -1327,6 +1393,7 @@
         }
     }
 
+    // === 👤 核心升級一：分離職責綁定獨立的 Operator 欄位 ===
     window.submitVerifyScan = function() {
         const actualQty = parseFloat(document.getElementById('verifyScanActual').value);
         if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的數量！"); return; }
@@ -1342,14 +1409,38 @@
         document.getElementById('verifyScanModal').classList.add('hidden');
 
         if (actualQty === expectedQty) {
-            if (currentCountMode === 'recount') item.recountDone = true;
-            if (currentCountMode === 'random') item.randomDone = true;
+            if (currentCountMode === 'recount') { item.recountDone = true; item.recountOperator = currentUser; }
+            if (currentCountMode === 'random') { item.randomDone = true; item.randomOperator = currentUser; }
             syncToFirebase(); window.renderZoneItems();
             window.isVerifying = false; 
         } else {
-            alert("❌ 數量不符！請簽名核准更正。");
+            if (isBlindCountMode) {
+                alert(`❌ 數量不符！\n\n系統初盤紀錄：${expectedQty}\n本次盲盤輸入：${actualQty}\n\n請重新確認或簽名核准更正。`);
+            } else {
+                alert("❌ 數量不符！請簽名核准更正。");
+            }
             window.pendingCorrectionQty = actualQty; 
             window.openSignaturePad(item.id, 'item'); 
+        }
+    }
+
+    // === 🔒 核心升級二：盲盤模式列表輸入核對 ===
+    window.submitBlindListVerify = function(itemId) {
+        const actualInput = document.getElementById(`blindVerifyInputList-${itemId}`).value;
+        const actualQty = parseFloat(actualInput);
+        if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的數量！"); return; }
+        
+        const item = scannedItems.find(i => i.id === itemId);
+        const expectedQty = parseFloat(item.initialQty) || 0;
+
+        if (actualQty === expectedQty) {
+            if (currentCountMode === 'recount') { item.recountDone = true; item.recountOperator = currentUser; }
+            if (currentCountMode === 'random') { item.randomDone = true; item.randomOperator = currentUser; }
+            syncToFirebase(); window.renderZoneItems();
+        } else {
+            alert(`❌ 數量不符！\n\n系統初盤紀錄：${expectedQty}\n本次盲盤輸入：${actualQty}\n\n請重新確認或簽名核准更正。`);
+            window.pendingCorrectionQty = actualQty; 
+            window.openSignaturePad(itemId, 'item'); 
         }
     }
 
@@ -1405,7 +1496,8 @@
         const isUncounted = (val) => val === null || val === undefined || val === "";
         if (item) {
             if (isUncounted(item.initialQty)) { alert("⚠️ 請先完成初盤數量輸入！"); return; }
-            if (currentCountMode === 'recount') item.recountDone = true; if (currentCountMode === 'random') item.randomDone = true;
+            if (currentCountMode === 'recount') { item.recountDone = true; item.recountOperator = currentUser; }
+            if (currentCountMode === 'random') { item.randomDone = true; item.randomOperator = currentUser; }
             syncToFirebase(); window.renderZoneItems();
         }
     }
@@ -1455,7 +1547,13 @@
             if (currentCountMode === 'random' && item.randomDone) return;
             renderedCount++;
 
-            const val = !isUncounted(item.initialQty) ? item.initialQty : ""; 
+            let val = !isUncounted(item.initialQty) ? item.initialQty : ""; 
+            
+            let displayVal = val;
+            if (isBlindCountMode && val !== "" && currentCountMode !== 'initial') {
+                displayVal = "***";
+            }
+
             const showInitial = currentCountMode === 'initial' ? '' : 'hidden'; 
             const showRecount = currentCountMode !== 'initial' ? '' : 'hidden';
             const rBadge = currentCountMode === 'random' ? `<span style="background: #fbd914; font-size: 12px; padding: 3px 6px; border-radius: 4px; margin-left: 8px;">🎯 抽盤</span>` : '';
@@ -1471,6 +1569,31 @@
                 sigHTML = `<img id="sigImage-${item.id}" class="sig-preview hidden">`;
             }
 
+            // === 🔒 核心升級二：盲盤模式列表 UI 動態切換 ===
+            let actionHTML = '';
+            if (isBlindCountMode && currentCountMode !== 'initial') {
+                actionHTML = `
+                    <div id="blindActions-${item.id}" style="margin-top:10px; padding-top:10px; border-top:1px dashed #ccc;">
+                        <label style="font-size:13px; font-weight:bold; color:#333; display:block; margin-bottom:5px;">盲盤比對 (請輸入實際數量)：</label>
+                        <input type="number" inputmode="decimal" min="0" step="any" id="blindVerifyInputList-${item.id}" placeholder="輸入數量" style="margin-bottom:8px; width:100%; padding:10px; border:2px solid #ccc; border-radius:4px; font-size:16px; text-align:center;">
+                        <button class="btn btn-primary" style="width:100%;" onclick="window.submitBlindListVerify('${item.id}')">確認核對</button>
+                        ${sigHTML}
+                    </div>
+                `;
+            } else {
+                actionHTML = `
+                    <div id="recountActions-${item.id}">
+                        <button class="btn btn-success" onclick="window.confirmItemCorrect('${item.id}')">✅ 無誤</button>
+                        <button class="btn btn-danger" onclick="document.getElementById('errorSection-${item.id}').classList.remove('hidden'); this.parentElement.classList.add('hidden')">❌ 有誤</button>
+                    </div>
+                    <div id="errorSection-${item.id}" class="hidden" style="margin-top:10px; border-top:1px dashed #ccc; padding-top:10px;">
+                        <input type="number" inputmode="decimal" min="0" step="any" id="manualVerifyInput-${item.id}" placeholder="正確數量">
+                        <button class="btn btn-primary" style="margin-top:10px;" onclick="window.triggerManualCorrection('${item.id}')">✍️ 錯誤更正簽名</button>
+                        ${sigHTML}
+                    </div>
+                `;
+            }
+
             container.insertAdjacentHTML('beforeend', `
             <div class="card ${val !== "" ? 'done' : ''}" id="card-${item.id}">
                 <div class="item-title">${item.name} <span style="color:#0058a3">(${item.unit})</span> ${rBadge}</div>
@@ -1479,22 +1602,12 @@
                     <input type="number" inputmode="decimal" pattern="[0-9]*" min="0" step="any" id="qty-${item.id}" value="${val}" placeholder="直接點選輸入數量" onchange="window.updateQty('${item.id}')" onkeydown="window.handleEnter(event, '${item.id}')">
                 </div>
                 <div class="recount-section ${showRecount}">
-                    <p>初盤數量：<strong style="font-size:20px; color:#0058a3;">${val === "" ? "未盤" : val}</strong></p>
+                    <p>初盤數量：<strong style="font-size:20px; color:#0058a3;">${val === "" ? "未盤" : displayVal}</strong></p>
                     ${val === "" ? `
                         <div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 6px; border-left: 4px solid #ffc107;">
                             ⚠️ 請先完成初盤數量輸入，才可進行覆核。
                         </div>
-                    ` : `
-                        <div id="recountActions-${item.id}">
-                            <button class="btn btn-success" onclick="window.confirmItemCorrect('${item.id}')">✅ 無誤</button>
-                            <button class="btn btn-danger" onclick="document.getElementById('errorSection-${item.id}').classList.remove('hidden'); this.parentElement.classList.add('hidden')">❌ 有誤</button>
-                        </div>
-                        <div id="errorSection-${item.id}" class="hidden" style="margin-top:10px; border-top:1px dashed #ccc; padding-top:10px;">
-                            <input type="number" inputmode="decimal" min="0" step="any" id="manualVerifyInput-${item.id}" placeholder="正確數量">
-                            <button class="btn btn-primary" style="margin-top:10px;" onclick="window.triggerManualCorrection('${item.id}')">✍️ 錯誤更正簽名</button>
-                            ${sigHTML}
-                        </div>
-                    `}
+                    ` : actionHTML}
                 </div>
             </div>`);
         });
@@ -1537,6 +1650,7 @@
         const itemIndex = scannedItems.findIndex(i => i.id === itemId);
         if(itemIndex > -1) { 
             scannedItems[itemIndex].initialQty = parseFloat(inputVal) < 0 ? 0 : inputVal; 
+            scannedItems[itemIndex].initialOperator = currentUser; 
             if (!systemStartTime && inputVal !== "") systemStartTime = Date.now(); 
             syncToFirebase(); 
             const card = document.getElementById(`card-${itemId}`); if(card) { if(inputVal !== "") card.classList.add('done'); else card.classList.remove('done'); } 
@@ -1591,8 +1705,12 @@
     window.saveOnTheFlyItem = function() {
         const code = document.getElementById('flyCode').value.trim(); const name = document.getElementById('flyName').value.trim(); const unit = document.getElementById('flyUnit').value.trim(); const qty = document.getElementById('flyQty').value;
         if(!code || !name || !unit || qty === "") { alert("請完整輸入商品資訊與初盤數量！"); return; }
-        productDatabase[code] = { name: name, unit: unit }; window.addToInventoryList(code, name, unit, currentActiveZone, qty);
+        productDatabase[code] = { name: name, unit: unit }; 
+        
+        scannedItems.push({ id: window.generateUUID(), code: code, name: name, unit: unit, zone: currentActiveZone, initialQty: qty, initialOperator: currentUser, isRandomChecked: false, recountDone: false, randomDone: false, correctionHistory: [] });
+        
         if (!systemStartTime) systemStartTime = Date.now();
+        syncToFirebase();
         window.closeOnTheFlyModal(); window.renderZoneItems(); alert("✅ 臨時商品已成功加入本盤區！");
     }
 
@@ -1646,14 +1764,15 @@
                         oldQty: item.initialQty,
                         newQty: window.pendingCorrectionQty,
                         mode: currentCountMode,
+                        operator: currentUser,
                         sign: imgData
                     });
                     item.initialQty = window.pendingCorrectionQty;
                     window.pendingCorrectionQty = null; 
                 }
                 
-                if (currentCountMode === 'recount') item.recountDone = true; 
-                if (currentCountMode === 'random') item.randomDone = true; 
+                if (currentCountMode === 'recount') { item.recountDone = true; item.recountOperator = currentUser; } 
+                if (currentCountMode === 'random') { item.randomDone = true; item.randomOperator = currentUser; } 
             }
             syncToFirebase(); setTimeout(() => { window.renderZoneItems(); }, 500);
         } else if (currentSignContext.type === 'zone') {
