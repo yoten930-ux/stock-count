@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 極速掃描效能版</title>
+    <title>SFM 完整盤點系統 - 廣角極速掃描版</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -293,7 +293,6 @@
                     <span id="dashZoneStats">已驗收 0 / 0 區</span>
                     <span id="dashItemStats">已盤 0 / 0 項</span>
                 </div>
-                <!-- 預估剩餘時間 -->
                 <div id="dashETA" style="margin-top: 10px; font-size: 14px; font-weight: bold; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
                     ⏳ 預估剩餘時間：系統計算中...
                 </div>
@@ -381,7 +380,6 @@
                 <button class="btn btn-primary" style="flex:2;" onclick="saveSignature()">確認送出</button>
             </div>
             
-            <!-- 快速套用區塊 -->
             <div id="defaultSignatureSection" class="hidden" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc;">
                 <p style="font-size:12px; color:#666; margin:0 0 5px 0;">快速套用個人簽名：</p>
                 <button class="btn btn-outline" style="width: 100%; border-style: dashed; padding: 10px;" onclick="useDefaultSignature()">🔏 一鍵套用預設簽名</button>
@@ -830,7 +828,12 @@
         const randomItems = itemsInZone.filter(i => i.isRandomChecked);
         const allRandomsDone = randomItems.length === 0 || randomItems.every(i => i.randomDone);
         const zStat = zoneStatus[z] || {}; const hasAllSigns = !!zStat.sign_zoneInitial && !!zStat.sign_zoneRecount && !!zStat.sign_zoneRandom;
-        return allItemsCounted && allRecountsDone && allRandomsDone && hasAllSigns;
+        
+        if (allItemsCounted && allRecountsDone && allRandomsDone && hasAllSigns) {
+            if (!zoneStatus[z].completedAt) { zoneStatus[z].completedAt = Date.now(); syncToFirebase(); }
+            return true;
+        }
+        return false;
     }
 
     window.updateModeUI = function() {
@@ -1141,19 +1144,46 @@
         document.getElementById('cameraModalTitle').innerText = mode === 'create' ? "掃描新增商品" : `以掃代打 (${currentCountMode === 'initial' ? '累加初盤' : '覆核比對'})`;
         document.getElementById('cameraModalSubtitle').innerText = mode === 'create' ? "將加入盤單清單中" : "鏡頭對準條碼，自動執行動作";
 
+        // 修改 1：啟動強制連續對焦與原生解析引擎 (提升靈敏度)
         html5QrcodeScanner = new Html5Qrcode("reader");
         html5QrcodeScanner.start(
-            { facingMode: "environment" }, 
-            { fps: 10, qrbox: { width: 250, height: 100 }, formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A ] }, 
+            { facingMode: "environment", focusMode: "continuous" }, // 啟動連續對焦
+            { 
+                fps: 30, // 幀率拉到最高 30
+                qrbox: function(viewfinderWidth, viewfinderHeight) {
+                    return {
+                        width: Math.floor(viewfinderWidth * 0.9), // 動態抓取 90% 螢幕寬度
+                        height: 150
+                    };
+                },
+                useBarCodeDetectorIfSupported: true, // 啟用原生硬體加速解碼
+                formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A ] 
+            }, 
             (txt) => { 
-                if (window.isVerifying) return; // 相機鎖定防呆
+                if (window.isVerifying) return; 
                 if (txt === lastScanCode && (Date.now() - lastScanTime) < 1500) return;
                 lastScanCode = txt; lastScanTime = Date.now(); window.playBeep();
                 if (scanMode === 'create') { document.getElementById('itemCodeInput').value = txt; window.processScan(); } 
                 else if (scanMode === 'count') { window.processCountScan(txt); }
             }, 
             () => {}
-        ).catch(() => { alert("無法開啟相機。請確認權限或連線安全性。"); window.stopCameraScanner(); });
+        ).catch(() => { 
+            // 雙重防護：如果手機不支援 continuous focus，自動退回安全模式重試
+            html5QrcodeScanner.start(
+                { facingMode: "environment" }, 
+                { fps: 15, qrbox: function(vw, vh) { return { width: Math.floor(vw * 0.9), height: 150 }; } }, 
+                (txt) => { 
+                    if (window.isVerifying) return; 
+                    if (txt === lastScanCode && (Date.now() - lastScanTime) < 1500) return;
+                    lastScanCode = txt; lastScanTime = Date.now(); window.playBeep();
+                    if (scanMode === 'create') { document.getElementById('itemCodeInput').value = txt; window.processScan(); } 
+                    else if (scanMode === 'count') { window.processCountScan(txt); }
+                }, 
+                () => {}
+            ).catch(() => {
+                alert("無法開啟相機。請確認權限或連線安全性。"); window.stopCameraScanner(); 
+            });
+        });
     }
 
     window.stopCameraScanner = function() { 
@@ -1496,7 +1526,6 @@
     canvas.addEventListener('touchstart', handleStart, {passive:false}); canvas.addEventListener('touchmove', handleMove, {passive:false}); canvas.addEventListener('touchend', handleEnd);
     window.clearCanvas = function() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
     
-    // UI: 加入預設簽名的邏輯
     window.openSignaturePad = function(targetId, contextType = 'item') { 
         currentSignContext = { type: contextType, targetId: targetId }; document.getElementById('signatureModal').classList.remove('hidden'); window.resizeCanvas(); window.clearCanvas(); 
         
