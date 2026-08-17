@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 智慧乾淨快捷鍵版</title>
+    <title>SFM 完整盤點系統 - 智慧分類引擎版</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -512,6 +512,8 @@
                 if (currentActiveZone) { window.renderZoneItems(); window.renderZoneSignatures(); } else { window.renderZoneDashboard(); }
             }
             if (!document.getElementById('tab-dashboard').classList.contains('hidden')) { window.renderDashboard(); }
+            // 確保一開始就能顯示第二步按鈕
+            if (!document.getElementById('tab-create').classList.contains('hidden')) { window.renderQuickZoneButtons(); }
         }
     }
 
@@ -612,10 +614,14 @@
     }
     window.updateHeaderMonth = function() { document.querySelectorAll('.display-month').forEach(el => el.innerText = currentInventoryMonth); }
 
+    // 部門切換邏輯 (隔離防線)
     window.setDepartment = function(dept) {
         currentDepartment = dept;
         document.querySelectorAll('.dept-btn').forEach(btn => { btn.classList.toggle('active', btn.dataset.dept === dept); });
-        window.renderZoneChecklist(); window.renderCreateListTable(); window.renderZoneDashboard();
+        window.renderQuickZoneButtons(); // 切換部門時，重繪第二步的快捷鍵
+        window.renderZoneChecklist(); 
+        window.renderCreateListTable(); 
+        window.renderZoneDashboard();
     }
 
     window.playBeep = function() {
@@ -671,142 +677,88 @@
         document.getElementById('navCount').classList.toggle('active', tab === 'count');
         document.getElementById('navDashboard').classList.toggle('active', tab === 'dashboard');
 
-        if (tab === 'create') { window.renderZoneChecklist(); window.renderCreateListTable(); } 
+        if (tab === 'create') { window.renderQuickZoneButtons(); window.renderZoneChecklist(); window.renderCreateListTable(); } 
         if (tab === 'count') { window.backToZoneList(); window.stopCameraScanner(); }
         if (tab === 'dashboard') { window.renderDashboard(); window.stopCameraScanner(); }
         if (tab === 'history') { window.renderHistoryList(); window.stopCameraScanner(); } 
         if (tab === 'home') { window.stopCameraScanner(); }
     }
 
-    window.renderDashboard = function() {
-        const container = document.getElementById('dashIssuesContainer');
-        const activeZonesArray = window.sortZones([...knownZones].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
+    // === 🧠 核心升級一：共用的分類擷取器 (支援拆分邏輯) ===
+    window.getZoneCategory = function(zoneName, deptZonesArray = []) {
+        if (!zoneName) return '其他'; 
         
-        let totalItems = scannedItems.length;
-        const isUncounted = (val) => val === null || val === undefined || val === "";
-        let countedItems = scannedItems.filter(i => !isUncounted(i.initialQty)).length;
+        // 嚴格抓取：最前面的英文、中文或「數字+樓」
+        const match = zoneName.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)/);
+        if (!match || !match[1]) return '其他';
         
-        let finishedZonesCount = 0;
-        let issuesHtml = "";
+        const prefix = match[1].toUpperCase();
+        
+        // 如果傳入了當前部門的盤區陣列，我們來計算是否需要拆分
+        if (deptZonesArray.length > 0) {
+            // 計算這個字首的盤區有幾個
+            const prefixCount = deptZonesArray.filter(z => {
+                const m = z.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)/);
+                return m && m[1].toUpperCase() === prefix;
+            }).length;
 
-        let multipleCorrections = scannedItems.filter(i => i.correctionHistory && i.correctionHistory.length > 1);
-        if (multipleCorrections.length > 0) {
-            issuesHtml += `<h4 style="color:#c62828; margin-top:5px; border-bottom:2px solid #ffcdd2; padding-bottom:5px;">🚨 需特別注意：多次更正商品</h4>`;
-            multipleCorrections.forEach(i => {
-                const deptName = (zoneDepartments[i.zone] || 'SFM') === 'REST' ? '🍽️' : '🛒';
-                issuesHtml += `<div class="issue-card" style="background:#ffebee; border-left-color:#f44336; color:#c62828;">
-                    <strong>${deptName} [${i.zone}] - ${i.name}</strong><br>
-                    <span style="font-size:14px;">已被更正 ${i.correctionHistory.length} 次，請店長優先查核！</span>
-                </div>`;
-            });
-            issuesHtml += `<h4 style="color:#0058a3; margin-top:20px; border-bottom:2px solid #ccc; padding-bottom:5px;">⚠️ 待處理盤區清單</h4>`;
-        }
-
-        activeZonesArray.forEach(z => {
-            const isZoneDone = window.checkZoneDone(z);
-            if (isZoneDone) {
-                finishedZonesCount++;
-            } else {
-                const zItems = scannedItems.filter(i => i.zone === z);
-                let reason = [];
-                
-                if (zItems.length === 0) {
-                    reason = ["尚無商品加入清單"];
-                } else {
-                    const uncounted = zItems.filter(i => isUncounted(i.initialQty)).length;
-                    if (uncounted > 0) reason.push(`缺 ${uncounted} 項初盤`);
-                    
-                    const zStat = zoneStatus[z] || {};
-                    if (!zStat.sign_zoneInitial) reason.push("缺初盤簽名");
-                    if (!zStat.sign_zoneRecount) reason.push("缺覆盤簽名");
-                    if (!zStat.sign_zoneRandom) reason.push("缺抽盤簽名");
-                    
-                    const unRecounted = zItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
-                    if (unRecounted > 0) reason.push(`缺 ${unRecounted} 項覆盤確認`);
-                    const unRandomed = zItems.filter(i => i.isRandomChecked && !i.randomDone).length;
-                    if (unRandomed > 0) reason.push(`缺 ${unRandomed} 項抽盤確認`);
-                }
-
-                const deptName = (zoneDepartments[z] || 'SFM') === 'REST' ? '🍽️ 餐廳' : '🛒 超市';
-                issuesHtml += `<div class="issue-card">
-                    <strong>[${deptName}] 📍 ${z}</strong><br>
-                    <span style="font-size:14px;">${reason.join("、")}</span>
-                </div>`;
+            // 若數量大於 30 且目前的盤區有帶數字後綴，進行拆分
+            const numMatch = zoneName.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)(\d+)/);
+            if (prefixCount > 30 && numMatch && numMatch[2]) {
+                const num = parseInt(numMatch[2], 10);
+                const chunk = Math.ceil(num / 30) || 1;
+                const start = (chunk - 1) * 30 + 1;
+                const end = chunk * 30;
+                return `${prefix} (${start}-${end})`;
             }
-        });
-
-        const percent = activeZonesArray.length > 0 ? Math.round((finishedZonesCount / activeZonesArray.length) * 100) : 0;
-        document.getElementById('dashTotalPercent').innerText = `${percent}%`;
-        document.getElementById('dashProgressBar').style.width = `${percent}%`;
-        document.getElementById('dashZoneStats').innerText = `已嚴謹驗收 ${finishedZonesCount} / ${activeZonesArray.length} 區`;
-        document.getElementById('dashItemStats').innerText = `已完成初盤 ${countedItems} / ${totalItems} 項`;
-
-        let etaHtml = "";
-        let remainingItemsToCount = totalItems - countedItems;
-        if (systemStartTime && countedItems > 0 && finishedZonesCount < activeZonesArray.length) {
-            let elapsedMs = Date.now() - systemStartTime;
-            let msPerItem = elapsedMs / countedItems;
-            let msRemaining = msPerItem * remainingItemsToCount;
-            let minsRemaining = Math.max(1, Math.round(msRemaining / 60000));
-            let timeStr = minsRemaining >= 60 ? `${Math.floor(minsRemaining/60)} 小時 ${minsRemaining%60} 分鐘` : `${minsRemaining} 分鐘`;
-            etaHtml = `<span style="color:#ffeb3b;">⏳ 預估剩餘時間：約 ${timeStr}</span>`;
-        } else if (finishedZonesCount === activeZonesArray.length && activeZonesArray.length > 0) {
-            etaHtml = `<span style="color:#4CAF50;">✅ 盤點已全數完成！</span>`;
-        } else {
-            etaHtml = `<span style="color:#ccc;">⏳ 預估時間：完成首項後計算</span>`;
         }
-        document.getElementById('dashETA').innerHTML = etaHtml;
-
-        if (issuesHtml === "") {
-            container.innerHTML = "<div style='text-align:center; color:#155724; background:#d4edda; padding:20px; border-radius:8px;'>🏆 恭喜！全館盤區皆已嚴謹驗收完成，可準備結算匯出！</div>";
-        } else {
-            container.innerHTML = issuesHtml;
-        }
+        
+        return prefix; // 如果不滿 30 個，或是沒有帶數字，直接回傳純字首
     }
 
-    // === 🧹 核心優化：智慧產生乾淨的盤區快捷鍵 ===
+    // === 🎯 核心升級二：確保第二步按鈕與第四步完全同步 ===
     window.renderQuickZoneButtons = function() {
         const container = document.getElementById('quickZoneCategories');
         if (!container) return;
         
-        let prefixes = new Set();
-        // 嚴格抓取：只抓前面的純英文、純中文、或「數字+樓」
-        knownZones.forEach(zone => {
-            const match = zone.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)/);
-            if (match && match[1]) {
-                prefixes.add(match[1].toUpperCase());
-            } else {
-                prefixes.add(zone); // 如果都不符合，保留整串
-            }
-        });
+        // 只抓出屬於目前部門 (餐廳 or 超市) 的盤區
+        const deptZones = [...knownZones].filter(z => (zoneDepartments[z] || 'SFM') === currentDepartment);
+        
+        const categories = new Set();
+        deptZones.forEach(z => categories.add(window.getZoneCategory(z, deptZones)));
         
         let html = '';
-        [...prefixes].sort().forEach(prefix => {
-            if(prefix !== "自訂" && prefix !== "SETTING") { 
-                html += `<button class="cat-tab" onclick="selectQuickZonePrefix('${prefix}')">${prefix}</button>`;
+        [...categories].sort().forEach(cat => {
+            if(cat !== '其他' && cat !== 'SETTING') {
+                // 為了讓點擊後 input 只填入 'SFM' 而不是 'SFM (1-30)'
+                const basePrefix = cat.split(' ')[0]; 
+                html += `<button class="cat-tab" onclick="selectQuickZonePrefix('${basePrefix}', this)">${cat}</button>`;
             }
         });
-        html += `<button class="cat-tab" onclick="selectQuickZonePrefix('自訂')" style="background-color: #fff3cd; color: #856404; border-color: #ffeeba;">✍️ 自訂</button>`;
+        html += `<button class="cat-tab" onclick="selectQuickZonePrefix('自訂', this)" style="background-color: #fff3cd; color: #856404; border-color: #ffeeba;">✍️ 自訂</button>`;
         
         container.innerHTML = html;
     }
 
-    window.getZoneCategory = function(zoneName) {
-        if (!zoneName) return '其他'; const upperZone = zoneName.toUpperCase();
-        if (upperZone.includes('收貨區')) return '收貨區'; if (upperZone.includes('4樓') || upperZone.includes('4F')) return '4樓';
-        if (upperZone.startsWith('BIS')) return 'BIS'; if (upperZone.startsWith('BUF')) return 'BUF'; if (upperZone.startsWith('STO')) return 'STO';
-        if (upperZone.startsWith('SFM')) {
-            const match = upperZone.match(/SFM(\d+)/);
-            if (match) { const num = parseInt(match[1], 10); if (num <= 30) return 'SFM (1-30)'; else return 'SFM (31-60)'; } return 'SFM'; 
-        } return '其他';
-    }
-
     window.renderTabs = function(zonesArray, containerId, activeCategory, clickFunctionName) {
-        const container = document.getElementById(containerId); if (zonesArray.length === 0) { container.innerHTML = ""; return; }
-        const categories = new Set(['全部']); zonesArray.forEach(z => categories.add(window.getZoneCategory(z)));
-        const order = ['全部', 'BIS', 'SFM (1-30)', 'SFM (31-60)', 'SFM', 'BUF', 'STO', '收貨區', '4樓', '其他'];
-        const sortedCategories = [...categories].sort((a, b) => { let indexA = order.indexOf(a); let indexB = order.indexOf(b); if(indexA === -1) indexA = 99; if(indexB === -1) indexB = 99; return indexA - indexB; });
-        let html = ''; sortedCategories.forEach(cat => { const isActive = cat === activeCategory ? 'active' : ''; html += `<button class="cat-tab ${isActive}" onclick="window.${clickFunctionName}('${cat}')">${cat}</button>`; });
+        const container = document.getElementById(containerId); 
+        if (zonesArray.length === 0) { container.innerHTML = ""; return; }
+        
+        const categories = new Set(['全部']); 
+        zonesArray.forEach(z => categories.add(window.getZoneCategory(z, zonesArray)));
+        
+        // 確保 '全部' 永遠在最前面
+        const sortedCategories = [...categories].sort((a, b) => {
+            if (a === '全部') return -1;
+            if (b === '全部') return 1;
+            return a.localeCompare(b);
+        });
+
+        let html = ''; 
+        sortedCategories.forEach(cat => { 
+            const isActive = cat === activeCategory ? 'active' : ''; 
+            html += `<button class="cat-tab ${isActive}" onclick="window.${clickFunctionName}('${cat}')">${cat}</button>`; 
+        });
         container.innerHTML = html;
     }
 
@@ -824,8 +776,13 @@
             prefix = zoneName;
         }
 
+        // 計算這個盤區隸屬於哪個分類標籤 (例如 SFM (1-30))
+        const deptZones = [...knownZones].filter(z => (zoneDepartments[z] || 'SFM') === currentDepartment);
+        const categoryName = window.getZoneCategory(zoneName, deptZones);
+
+        // 切換上方對應的按鈕狀態 (找符合類別名稱，或是底層前綴的按鈕)
         document.querySelectorAll('#quickZoneCategories .cat-tab').forEach(btn => { 
-            btn.classList.toggle('active', btn.innerText === prefix); 
+            btn.classList.toggle('active', btn.innerText === categoryName || btn.innerText === prefix); 
         });
         
         const prefixInput = document.getElementById('quickZonePrefix'); 
@@ -843,11 +800,17 @@
         document.getElementById('zoneSpecificTableContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    window.selectQuickZonePrefix = function(prefix) {
+    // 選擇動態捷徑按鈕
+    window.selectQuickZonePrefix = function(prefix, btnElement) {
         document.querySelectorAll('#quickZoneCategories .cat-tab').forEach(btn => { 
-            btn.classList.toggle('active', btn.innerText === prefix); 
+            btn.classList.remove('active');
         });
-        const prefixInput = document.getElementById('quickZonePrefix'); const suffixInput = document.getElementById('quickZoneSuffix'); const zoneInput = document.getElementById('zoneInput');
+        if(btnElement) btnElement.classList.add('active');
+
+        const prefixInput = document.getElementById('quickZonePrefix'); 
+        const suffixInput = document.getElementById('quickZoneSuffix'); 
+        const zoneInput = document.getElementById('zoneInput');
+        
         if (prefix === '自訂') {
             prefixInput.value = ''; suffixInput.value = ''; prefixInput.disabled = true; suffixInput.disabled = true;
             zoneInput.readOnly = false; zoneInput.value = ''; zoneInput.placeholder = '請手動輸入完整名稱...'; zoneInput.style.background = '#fff'; zoneInput.focus();
@@ -859,7 +822,7 @@
         window.renderCreateListTable(); 
     }
 
-    // === 🧠 核心優化：模糊比對自動補齊 (Fuzzy Smart Match) ===
+    // === 💡 核心升級三：模糊比對自動補齊 (Fuzzy Smart Match) ===
     window.updateFinalZone = function() {
         const prefix = document.getElementById('quickZonePrefix').value; 
         let suffix = document.getElementById('quickZoneSuffix').value;
@@ -877,13 +840,14 @@
                 prefix + suffix   
             ];
 
-            // 去資料庫裡尋找「以這些字首開頭」的完整盤區名
-            let matchedZone = [...knownZones].find(z => possiblePrefixes.some(p => z.startsWith(p)));
+            // 嚴格在「目前部門」的盤區中尋找，避免跨部門污染
+            const deptZones = [...knownZones].filter(z => (zoneDepartments[z] || 'SFM') === currentDepartment);
+            let matchedZone = deptZones.find(z => possiblePrefixes.some(p => z.startsWith(p)));
 
             if (matchedZone) {
                 finalZoneName = matchedZone; // 找到就直接套用完整名稱 (包含括號備註)
             } else {
-                // 找不到的話，預設幫他補 3 碼
+                // 找不到的話，如果是數字就預設幫他補 3 碼
                 if (!isNaN(suffix) && !['收貨區', '4樓'].includes(prefix)) {
                     finalZoneName = prefix + padded3;
                 } else {
@@ -916,7 +880,7 @@
             else { statusContainer.innerHTML = `<div class="overall-status overall-pending">⏳ 盤單製作未完成 (本部門已確認 ${readyZonesCount}/${zonesArray.length} 區)</div>`; }
         } else { statusContainer.innerHTML = ""; }
 
-        let filteredZones = activeChecklistCategory !== '全部' ? zonesArray.filter(z => window.getZoneCategory(z) === activeChecklistCategory) : zonesArray;
+        let filteredZones = activeChecklistCategory !== '全部' ? zonesArray.filter(z => window.getZoneCategory(z, zonesArray) === activeChecklistCategory) : zonesArray;
         if (filteredZones.length === 0) { container.innerHTML = `<p style='color:#666; font-size:14px;'>在此分類下無盤區資料。</p>`; return; }
 
         let html = '<table class="checklist-table"><thead><tr><th>盤區名稱</th><th>目前狀態</th><th>操作</th></tr></thead><tbody>';
@@ -1001,7 +965,7 @@
             else { statusContainer.innerHTML = `<div class="overall-status overall-pending">⏳ 本部門盤點進行中 (已驗收 ${finishedZonesCount}/${activeZonesArray.length} 區)</div>`; }
         } else { statusContainer.innerHTML = ""; }
 
-        let filteredZones = activeDashboardCategory !== '全部' ? activeZonesArray.filter(z => window.getZoneCategory(z) === activeDashboardCategory) : activeZonesArray;
+        let filteredZones = activeDashboardCategory !== '全部' ? activeZonesArray.filter(z => window.getZoneCategory(z, activeZonesArray) === activeDashboardCategory) : activeZonesArray;
         if (filteredZones.length === 0) { container.innerHTML = `<p style='text-align:center; color:#666;'>此分類下目前沒有需盤點的區域。</p>`; return; }
 
         container.innerHTML = "";
@@ -1263,24 +1227,47 @@
         document.getElementById('cameraModalTitle').innerText = mode === 'create' ? "掃描新增商品" : `以掃代打 (${currentCountMode === 'initial' ? '累加初盤' : '覆核比對'})`;
         document.getElementById('cameraModalSubtitle').innerText = mode === 'create' ? "將加入盤單清單中" : "鏡頭對準條碼，自動執行動作";
 
-        html5QrcodeScanner = new Html5Qrcode("reader");
-        html5QrcodeScanner.start(
-            { facingMode: "environment" }, 
-            { fps: 15, qrbox: { width: 250, height: 150 }, formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A ] }, 
-            (txt) => { 
-                if (window.isVerifying) return; 
-                if (txt === lastScanCode && (Date.now() - lastScanTime) < 1500) return;
-                lastScanCode = txt; lastScanTime = Date.now(); window.playBeep();
-                if (scanMode === 'create') { document.getElementById('itemCodeInput').value = txt; window.processScan(); } 
-                else if (scanMode === 'count') { window.processCountScan(txt); }
-            }, 
-            () => {}
-        ).catch(() => { alert("無法開啟相機。請確認瀏覽器相機權限是否已開啟。"); window.stopCameraScanner(); });
+        setTimeout(() => {
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            
+            const config = {
+                fps: 15, 
+                qrbox: { width: 250, height: 150 }, 
+                formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A ]
+            };
+
+            html5QrcodeScanner.start(
+                { facingMode: "environment" }, 
+                config, 
+                (txt) => { 
+                    if (window.isVerifying) return; 
+                    if (txt === lastScanCode && (Date.now() - lastScanTime) < 1500) return;
+                    lastScanCode = txt; lastScanTime = Date.now(); window.playBeep();
+                    if (scanMode === 'create') { document.getElementById('itemCodeInput').value = txt; window.processScan(); } 
+                    else if (scanMode === 'count') { window.processCountScan(txt); }
+                }, 
+                undefined
+            ).catch((err) => { 
+                console.error("相機啟動失敗:", err);
+                alert("⚠️ 無法開啟相機！\n系統訊息：" + err + "\n\n請確認：\n1. Safari/Chrome 已允許相機權限。\n2. 沒有被其他 App 佔用。"); 
+                window.stopCameraScanner(); 
+            });
+        }, 300);
     }
 
     window.stopCameraScanner = function() { 
-        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) { html5QrcodeScanner.stop().then(() => { document.getElementById('cameraModal').classList.add('hidden'); }); } 
-        else { document.getElementById('cameraModal').classList.add('hidden'); }
+        const modal = document.getElementById('cameraModal');
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) { 
+            html5QrcodeScanner.stop().then(() => { 
+                html5QrcodeScanner.clear();
+                modal.classList.add('hidden'); 
+            }).catch(() => {
+                modal.classList.add('hidden');
+            }); 
+        } else { 
+            if(html5QrcodeScanner) html5QrcodeScanner.clear();
+            modal.classList.add('hidden'); 
+        }
     }
 
     window.calculateVerifyDiff = function() {
