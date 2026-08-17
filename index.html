@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 廣角極速掃描版</title>
+    <title>SFM 完整盤點系統 - 離線防護與強制同步版</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -417,9 +417,11 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
+    // 🔑 補上 Firebase 資料庫專屬網址 databaseURL
     const firebaseConfig = {
         apiKey: "AIzaSyC4Yu58CX40ybgNeHB-HepYxLga1bIYZpA",
         authDomain: "stock-count-744d9.firebaseapp.com",
+        databaseURL: "https://stock-count-744d9-default-rtdb.firebaseio.com",
         projectId: "stock-count-744d9",
         storageBucket: "stock-count-744d9.firebasestorage.app",
         messagingSenderId: "164776013050",
@@ -457,6 +459,12 @@
 
     let sharedAudioCtx = null;
 
+    // 🛡️ 離線優先防護：網頁載入時立刻拉取本機資料顯示
+    window.addEventListener('DOMContentLoaded', () => {
+        loadPersistedDataLocalOnly();
+        updateUI();
+    });
+
     const connectedRef = ref(db, ".info/connected");
     onValue(connectedRef, (snap) => {
         const syncDot = document.querySelector('.sync-dot');
@@ -482,7 +490,6 @@
             savePersistedDataLocalOnly();
             updateUI();
         } else {
-            loadPersistedDataLocalOnly();
             if (scannedItems.length > 0 || knownZones.size > 0) syncToFirebase(); 
         }
         isFirstLoad = false;
@@ -1144,19 +1151,19 @@
         document.getElementById('cameraModalTitle').innerText = mode === 'create' ? "掃描新增商品" : `以掃代打 (${currentCountMode === 'initial' ? '累加初盤' : '覆核比對'})`;
         document.getElementById('cameraModalSubtitle').innerText = mode === 'create' ? "將加入盤單清單中" : "鏡頭對準條碼，自動執行動作";
 
-        // 修改 1：啟動強制連續對焦與原生解析引擎 (提升靈敏度)
+        // === 🚀 核心升級：強制連續對焦與硬體加速 ===
         html5QrcodeScanner = new Html5Qrcode("reader");
+        
+        // 優先嘗試最高效能配置
         html5QrcodeScanner.start(
-            { facingMode: "environment", focusMode: "continuous" }, // 啟動連續對焦
+            { facingMode: "environment", focusMode: "continuous" }, 
             { 
-                fps: 30, // 幀率拉到最高 30
+                fps: 30, // 提升幀率
                 qrbox: function(viewfinderWidth, viewfinderHeight) {
-                    return {
-                        width: Math.floor(viewfinderWidth * 0.9), // 動態抓取 90% 螢幕寬度
-                        height: 150
-                    };
+                    // 📏 動態擴大掃描框寬度，完美包覆 1D 條碼
+                    return { width: Math.floor(viewfinderWidth * 0.9), height: 150 };
                 },
-                useBarCodeDetectorIfSupported: true, // 啟用原生硬體加速解碼
+                useBarCodeDetectorIfSupported: true, // 調用手機硬體 AI 掃描引擎
                 formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A ] 
             }, 
             (txt) => { 
@@ -1168,7 +1175,7 @@
             }, 
             () => {}
         ).catch(() => { 
-            // 雙重防護：如果手機不支援 continuous focus，自動退回安全模式重試
+            // 🛡️ 防護機制：如果舊手機不支援連續對焦，自動降級啟動
             html5QrcodeScanner.start(
                 { facingMode: "environment" }, 
                 { fps: 15, qrbox: function(vw, vh) { return { width: Math.floor(vw * 0.9), height: 150 }; } }, 
@@ -1180,9 +1187,7 @@
                     else if (scanMode === 'count') { window.processCountScan(txt); }
                 }, 
                 () => {}
-            ).catch(() => {
-                alert("無法開啟相機。請確認權限或連線安全性。"); window.stopCameraScanner(); 
-            });
+            ).catch(() => { alert("無法開啟相機。請確認權限或連線安全性。"); window.stopCameraScanner(); });
         });
     }
 
