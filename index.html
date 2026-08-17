@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SFM 完整盤點系統 - 快速簽名版</title>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f5f7; margin: 0; padding: 0; color: #333; }
+        .content { padding: 20px; padding-bottom: 80px; }
+        .hidden { display: none !important; }
+        
+        .navbar { position: fixed; bottom: 0; left: 0; width: 100%; display: flex; background: #fff; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); z-index: 100; }
+        .nav-btn { flex: 1; padding: 15px 5px; text-align: center; font-weight: bold; font-size: 14px; border: none; background: none; cursor: pointer; color: #666; border-top: 3px solid transparent; }
+        .nav-btn.active { color: #0058a3; border-top: 3px solid #0058a3; background-color: #f9f9f9; }
+
+        .header { text-align: center; color: #0058a3; margin-bottom: 15px; font-size: 22px; font-weight: bold; position: relative; }
+        .home-btn { position: absolute; left: 0; top: 0; background: none; border: none; font-size: 16px; color: #0058a3; font-weight: bold; cursor: pointer; padding: 5px; }
+
+        .dept-switcher { display: flex; margin-bottom: 15px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .dept-btn { flex: 1; padding: 12px; border: none; background: #e0e0e0; color: #333; font-weight: bold; font-size: 15px; cursor: pointer; transition: all 0.2s; }
+        .dept-btn.active { background: #0058a3; color: white; }
+
+        .input-group { margin-bottom: 15px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        label { font-weight: bold; display: block; margin-bottom: 8px; color: #333; }
+        input[type="text"], input[type="number"], input[type="file"] { width: 100%; padding: 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; margin-bottom: 10px; transition: all 0.2s; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed !important; }
+        .btn-primary { background-color: #fbd914; color: #333; font-size: 18px; padding: 15px; }
+        .btn-outline { background-color: transparent; border: 2px solid #0058a3; color: #0058a3; }
+        .btn-success { background-color: #4CAF50; color: white; }
+        .btn-danger { background-color: #f44336; color: white; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #0058a3; color: white; }
+
+        .checklist-table th { background-color: #555; font-size: 14px; }
+        .checklist-table td { font-size: 14px; vertical-align: middle; }
+        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .status-green { background: #e8f5e9; color: #2e7d32; }
+        .status-red { background: #ffebee; color: #c62828; }
+        .status-grey { background: #f5f5f5; color: #616161; }
+
+        .category-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+        .cat-tab { padding: 8px 14px; border: 1px solid #0058a3; border-radius: 20px; background: white; color: #0058a3; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .cat-tab.active { background: #0058a3; color: white; }
+
+        .overall-status { padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; text-align: center; font-size: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .overall-pending { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .overall-complete { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+
+        .quick-zone-builder { background: #f9f9f9; padding: 10px; border-radius: 6px; border: 1px dashed #ccc; }
+        .quick-zone-row { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+
+        .zone-btn { background: white; border: 2px solid #0058a3; border-radius: 10px; padding: 20px; margin-bottom: 15px; width: 100%; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .zone-btn-title { font-size: 18px; font-weight: bold; color: #0058a3; }
+        .zone-badge { font-size: 14px; background: #eee; padding: 6px 12px; border-radius: 12px; color: #333; }
+        .zone-badge.complete { background: #4CAF50; color: white; font-weight: bold; }
+        .zone-badge.pending { background: #fff3cd; color: #856404; font-weight: bold; }
+
+        .card { background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 5px solid #ccc; transition: all 0.3s ease; }
+        .card.done { border-left-color: #4CAF50; }
+        .item-title { font-size: 18px; font-weight: bold; color: #333; }
+        .item-code { font-size: 14px; color: #666; margin-bottom: 10px; }
+
+        .home-menu-btn { background: white; border: 2px solid #ccc; border-radius: 12px; padding: 20px; margin-bottom: 15px; text-align: center; display: block; width: 100%; box-sizing: border-box; text-decoration: none; color: #333; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; }
+        .home-menu-btn h3 { margin: 0 0 8px 0; font-size: 20px; color: #0058a3; }
+        .home-menu-btn p { margin: 0; font-size: 14px; color: #666; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
+        .modal-container { background: white; padding: 20px; border-radius: 10px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; }
+        
+        canvas { border: 2px dashed #ccc; width: 100%; height: 200px; touch-action: none; background: #fafafa; }
+        
+        .zone-signoff-card { background: #e6f2ff; border: 1px solid #b3d4ff; border-radius: 8px; padding: 15px; margin-top: 20px; }
+        .sign-box { flex: 1; text-align: center; background: white; padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
+        .sig-preview { max-width: 100%; height: 60px; border: 1px solid #ddd; margin-top: 10px; background: #fafafa; object-fit: contain; }
+
+        .history-table th { background-color: #9c27b0; font-size: 14px; }
+        .history-table td { font-size: 14px; }
+        
+        #syncStatus { position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 15px; font-size: 12px; z-index: 2000; display: flex; align-items: center; gap: 5px; }
+        .sync-dot { width: 8px; height: 8px; background: #ccc; border-radius: 50%; display: inline-block; }
+
+        .dash-summary-card { background: linear-gradient(135deg, #0058a3, #003a6b); color: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .dash-number { font-size: 36px; font-weight: bold; margin: 10px 0; }
+        .progress-bar-bg { background: rgba(255,255,255,0.2); border-radius: 10px; height: 12px; overflow: hidden; margin-top: 10px; }
+        .progress-bar-fill { background: #fbd914; height: 100%; width: 0%; transition: width 0.5s ease; }
+        .issue-card { background: #fff3cd; border-left: 5px solid #ff9800; padding: 12px; border-radius: 6px; margin-bottom: 10px; color: #856404; }
+    </style>
+</head>
+<body>
+
+    <div id="syncStatus">
+        <span class="sync-dot"></span> <span id="syncText">系統初始化中...</span>
+    </div>
+
+    <div class="content">
+        <!-- ================= 分頁 0：系統首頁 ================= -->
+        <div id="tab-home">
+            <div class="header" style="margin-bottom: 20px; font-size: 26px;">
+                📦 <span class="display-month" onclick="window.changeMonth()" style="cursor:pointer; text-decoration:underline; color:#ff9800;" title="點擊修改盤點月份"></span> 盤點系統
+            </div>
+            
+            <button class="home-menu-btn" onclick="switchTab('create')">
+                <h3>📋 製作盤單</h3>
+                <p>切換部門、設定盤區、匯入預設商品</p>
+            </button>
+            <button class="home-menu-btn" onclick="switchTab('count')">
+                <h3>📱 進行現場盤點</h3>
+                <p>分部門進行初盤、覆盤、抽盤與人員簽核</p>
+            </button>
+            
+            <button class="home-menu-btn" style="border-color: #2196F3;" onclick="switchTab('dashboard')">
+                <h3 style="color: #2196F3;">📊 總覽儀表板 (店長視角)</h3>
+                <p>一頁掌握全館各區盤點進度與待辦事項</p>
+            </button>
+
+            <button class="home-menu-btn" style="border-color: #4CAF50;" onclick="exportToExcel()">
+                <h3 style="color: #4CAF50;">💾 合併結算與匯出</h3>
+                <p>將全館(雙部門)盤點與簽核資料合併匯出並封存</p>
+            </button>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button class="home-menu-btn" style="border-color: #ff9800; padding: 15px 10px;" onclick="exportJsonData()">
+                    <h3 style="color: #ff9800; font-size:16px;">📤 完整備份匯出</h3>
+                </button>
+                <button class="home-menu-btn" style="border-color: #ff9800; padding: 15px 10px;" onclick="document.getElementById('jsonUpload').click()">
+                    <h3 style="color: #ff9800; font-size:16px;">📥 完整系統還原</h3>
+                    <input type="file" id="jsonUpload" accept=".json" class="hidden" onchange="importJsonData(event)">
+                </button>
+            </div>
+
+            <button class="home-menu-btn" style="border-color: #9c27b0;" onclick="switchTab('history')">
+                <h3 style="color: #9c27b0;">🗄️ 歷史紀錄查詢</h3>
+                <p>查閱過往每個月已封存的歷史盤點資料</p>
+            </button>
+        </div>
+
+        <!-- ================= 分頁 1：製作盤單 ================= -->
+        <div id="tab-create" class="hidden">
+            <div class="header">📋 <span class="display-month" onclick="window.changeMonth()" style="cursor:pointer; text-decoration:underline; color:#ff9800;"></span> 製作盤單</div>
+            
+            <div class="dept-switcher">
+                <button class="dept-btn active" data-dept="SFM" onclick="window.setDepartment('SFM')">🛒 超市與美食小站</button>
+                <button class="dept-btn" data-dept="REST" onclick="window.setDepartment('REST')">🍽️ IKEA 餐廳</button>
+            </div>
+
+            <div class="input-group" style="background-color: #e6f2ff; border-left: 5px solid #0058a3;">
+                <label>📁 第一步：更新商品主檔與盤區設定</label>
+                <input type="file" id="excelUpload" accept=".xlsx, .xls" onchange="handleFileUpload(event)">
+                <div style="margin-top: 10px; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="importItemsCheckbox" checked style="width: auto; transform: scale(1.2); margin: 0;">
+                    <label for="importItemsCheckbox" style="margin: 0; font-weight: normal; color: #0058a3; cursor: pointer;">
+                        <b>同時匯入本部門預設商品清單</b>
+                    </label>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>第二步：快速建立或切換盤點區域</label>
+                <div class="quick-zone-builder">
+                    <div class="category-tabs" id="quickZoneCategories">
+                        <button class="cat-tab" onclick="selectQuickZonePrefix('SFM')">SFM</button>
+                        <button class="cat-tab" onclick="selectQuickZonePrefix('BIS')">BIS</button>
+                        <button class="cat-tab" onclick="selectQuickZonePrefix('BUF')">BUF</button>
+                        <button class="cat-tab" onclick="selectQuickZonePrefix('STO')">STO</button>
+                        <button class="cat-tab" onclick="selectQuickZonePrefix('收貨區')">收貨區</button>
+                        <button class="cat-tab" onclick="selectQuickZonePrefix('4樓')">4樓</button>
+                        <button class="cat-tab" onclick="selectQuickZonePrefix('自訂')" style="background-color: #fff3cd; color: #856404; border-color: #ffeeba;">✍️ 自訂</button>
+                    </div>
+                    <div class="quick-zone-row">
+                        <input type="text" id="quickZonePrefix" placeholder="前綴" style="width:25%; background:#eee; text-align:center;" readonly>
+                        <span style="font-weight:bold;">+</span>
+                        <input type="number" min="0" id="quickZoneSuffix" placeholder="號碼" style="width:35%;" onkeyup="updateFinalZone()" onchange="updateFinalZone()">
+                        <span style="font-weight:bold;">=</span>
+                        <input type="text" id="zoneInput" placeholder="最終盤區" style="width:40%; background:#e8f5e9; font-weight:bold; color:#2e7d32;" readonly onkeyup="updateCustomZone()">
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>第三步：手動輸入或掃描貨號加入盤單</label>
+                <div style="display:flex; gap:10px; margin-bottom: 15px;">
+                    <input type="text" id="itemCodeInput" placeholder="輸入條碼...">
+                    <button class="btn btn-outline" style="width:auto; margin-bottom:0; padding: 0 15px; font-size: 20px;" onclick="startCameraScanner('create')" title="相機掃描">📷</button>
+                </div>
+                <button class="btn btn-primary" onclick="processScan()">✅ 確認加入商品</button>
+            </div>
+
+            <div id="zoneSpecificTableContainer">
+                <h4 style="color: #0058a3; border-bottom: 2px solid #0058a3; padding-bottom: 5px;">本區待盤點商品清單</h4>
+                <table id="inventoryTable" class="hidden">
+                    <thead><tr><th>盤區</th><th>貨號</th><th>品名</th><th style="width:60px; text-align:center;">操作</th></tr></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+                <p id="emptyTableMsg" style="text-align:center; color:#666; font-size:14px; margin-top:10px;">目前尚無商品，或請先於上方選擇盤區。</p>
+            </div>
+            
+            <div id="manualAddSection" class="hidden" style="background: #fff3cd; padding: 15px; border-radius: 6px; margin-bottom: 15px; margin-top:15px;">
+                <label style="color:red;">⚠️ 系統無此貨號，請手動建檔：</label>
+                <input type="text" id="manualCode" disabled style="margin-bottom:10px; background:#eee;">
+                <input type="text" id="manualName" placeholder="商品品名" style="margin-bottom:10px;">
+                <input type="text" id="manualUnit" placeholder="單位 (例: 箱、個)" style="margin-bottom:10px;">
+                <button class="btn btn-success" onclick="saveManualItem()">存入資料庫並加入盤單</button>
+                <button class="btn btn-danger" onclick="cancelManualItem()">取消</button>
+            </div>
+
+            <div class="input-group" style="margin-top: 20px;">
+                <label>第四步：本部門遺漏檢查清單</label>
+                <div id="checklistTabsContainer" class="category-tabs"></div>
+                <div id="checklistOverallStatus"></div>
+                <div id="zoneChecklistContainer"></div>
+            </div>
+        </div>
+
+        <!-- ================= 分頁 2：現場盤點 ================= -->
+        <div id="tab-count" class="hidden">
+            <div id="view-zone-list">
+                <div class="header">📱 <span class="display-month" onclick="window.changeMonth()" style="cursor:pointer; text-decoration:underline; color:#ff9800;"></span> 現場盤點</div>
+                
+                <div class="dept-switcher">
+                    <button class="dept-btn active" data-dept="SFM" onclick="window.setDepartment('SFM')">🛒 超市與美食小站</button>
+                    <button class="dept-btn" data-dept="REST" onclick="window.setDepartment('REST')">🍽️ IKEA 餐廳</button>
+                </div>
+
+                <div id="dashboardTabsContainer" class="category-tabs" style="margin-bottom: 10px;"></div>
+                <div id="dashboardOverallStatus"></div>
+                <div id="zoneDashboardContainer"><p style="text-align:center; color:#666;">本部門尚未建立任何盤單資料。</p></div>
+            </div>
+
+            <div id="view-zone-detail" class="hidden">
+                <div class="header">
+                    <button class="home-btn" onclick="backToZoneList()">⬅️ 返回</button>
+                    <span id="currentZoneTitle">盤區名稱</span>
+                </div>
+                
+                <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                    <button class="btn" id="btnModeInitial" onclick="setCountMode('initial')" style="background-color: #0058a3; color: white; margin-bottom:0;">初盤</button>
+                    <button class="btn" id="btnModeRecount" onclick="setCountMode('recount')" style="background-color: #e0e0e0; color: #333; margin-bottom:0;">覆盤</button>
+                    <button class="btn" id="btnModeRandom" onclick="setCountMode('random')" style="background-color: #e0e0e0; color: #333; margin-bottom:0;">抽盤</button>
+                </div>
+                <!-- 動態狀態提示區 -->
+                <div id="modeStatusHint" style="font-size: 13px; color: #f44336; margin-bottom: 15px; font-weight: bold; min-height: 18px;"></div>
+
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button class="btn btn-outline" style="border-style: dashed; padding: 10px; font-size: 14px; flex: 1;" onclick="openOnTheFlyModal()">➕ 手動打字新增</button>
+                    <button class="btn btn-primary" id="btnContinuousScan" style="padding: 10px; font-size: 14px; flex: 1;" onclick="startCameraScanner('count')">📷 連續掃描</button>
+                </div>
+
+                <div id="inventoryListContainer"></div>
+
+                <div class="zone-signoff-card">
+                    <h3 style="margin-top: 0; color: #0058a3; font-size: 16px;">📝 本區盤點作業簽核 (三者皆簽始完成)</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <div class="sign-box">
+                            <span style="font-size: 12px; font-weight: bold; display: block; margin-bottom: 5px;">初盤</span>
+                            <button class="btn btn-outline" style="padding: 5px; font-size: 12px; margin-bottom: 0;" onclick="openSignaturePad('zoneInitial', 'zone')">簽名</button>
+                            <img id="sigZone-zoneInitial" class="sig-preview hidden">
+                        </div>
+                        <div class="sign-box">
+                            <span style="font-size: 12px; font-weight: bold; display: block; margin-bottom: 5px;">覆盤</span>
+                            <button class="btn btn-outline" style="padding: 5px; font-size: 12px; margin-bottom: 0;" onclick="openSignaturePad('zoneRecount', 'zone')">簽名</button>
+                            <img id="sigZone-zoneRecount" class="sig-preview hidden">
+                        </div>
+                        <div class="sign-box">
+                            <span style="font-size: 12px; font-weight: bold; display: block; margin-bottom: 5px;">抽盤</span>
+                            <button class="btn btn-outline" style="padding: 5px; font-size: 12px; margin-bottom: 0;" onclick="openSignaturePad('zoneRandom', 'zone')">簽名</button>
+                            <img id="sigZone-zoneRandom" class="sig-preview hidden">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= 分頁 4：總覽儀表板 ================= -->
+        <div id="tab-dashboard" class="hidden">
+            <div class="header">
+                <button class="home-btn" onclick="switchTab('home')">🏠</button>
+                📊 全館盤點總覽儀表板
+            </div>
+
+            <div class="dash-summary-card">
+                <div style="font-size: 14px; opacity: 0.9;">全館整體盤點進度</div>
+                <div class="dash-number" id="dashTotalPercent">0%</div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="dashProgressBar"></div>
+                </div>
+                <div style="margin-top: 15px; font-size: 14px; display: flex; justify-content: space-between;">
+                    <span id="dashZoneStats">已驗收 0 / 0 區</span>
+                    <span id="dashItemStats">已盤 0 / 0 項</span>
+                </div>
+                <div id="dashETA" style="margin-top: 10px; font-size: 14px; font-weight: bold; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+                    ⏳ 預估剩餘時間：系統計算中...
+                </div>
+            </div>
+
+            <h3 style="color: #0058a3; border-bottom: 2px solid #ccc; padding-bottom: 5px;">⚠️ 待處理盤區清單 (未完成)</h3>
+            <div id="dashIssuesContainer"></div>
+        </div>
+
+        <!-- ================= 分頁 3：歷史紀錄 ================= -->
+        <div id="tab-history" class="hidden">
+            <div class="header">
+                <button class="home-btn" onclick="switchTab('home')">🏠</button>
+                <span style="color: #9c27b0;">🗄️ 歷史紀錄查詢</span>
+            </div>
+            
+            <div id="historyListView">
+                <div id="historyListContainer"></div>
+            </div>
+
+            <div id="historyDetailView" class="hidden">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <button class="btn btn-outline" style="border-color: #9c27b0; color: #9c27b0; width: auto; margin: 0;" onclick="backToHistoryList()">⬅️ 返回</button>
+                    <button class="btn btn-danger" style="width: auto; margin: 0; padding: 8px 12px; font-size: 14px;" id="btnDeleteHistory">🗑️ 刪除此紀錄</button>
+                </div>
+                
+                <h3 id="historyDetailTitle" style="color: #9c27b0; text-align: center;"></h3>
+                <div style="background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <table class="history-table" style="margin-top: 0;">
+                        <thead><tr><th>部門</th><th>盤區</th><th>貨號</th><th>品名</th><th style="width:50px; text-align:center;">數量</th></tr></thead>
+                        <tbody id="historyDetailTableBody"></tbody>
+                    </table>
+                </div>
+                <div id="historySignatures" style="margin-top: 20px;"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 底部導覽列 -->
+    <div class="navbar" id="bottomNavbar">
+        <button class="nav-btn active" id="navHome" onclick="switchTab('home')">🏠<br>首頁</button>
+        <button class="nav-btn" id="navCreate" onclick="switchTab('create')">📋<br>盤單</button>
+        <button class="nav-btn" id="navCount" onclick="switchTab('count')">📱<br>盤點</button>
+        <button class="nav-btn" id="navDashboard" onclick="switchTab('dashboard')">📊<br>總覽</button>
+    </div>
+
+    <!-- 全域相機彈窗 -->
+    <div id="cameraModal" class="modal-overlay hidden" style="z-index: 1000;">
+        <div class="modal-container" style="background: white; padding: 15px;">
+            <h3 id="cameraModalTitle" style="margin-top:0; color:#0058a3;">掃描條碼</h3>
+            <p id="cameraModalSubtitle" style="font-size:12px; color:#666; margin-top:-5px;">將鏡頭對準條碼即可自動讀取...</p>
+            <div id="reader" style="width:100%; max-width:400px; margin:auto;"></div>
+            <button class="btn btn-danger" style="margin-top:15px;" onclick="stopCameraScanner()">🛑 關閉相機</button>
+        </div>
+    </div>
+
+    <!-- 覆核驗證彈窗 -->
+    <div id="verifyScanModal" class="modal-overlay hidden" style="z-index: 1100;">
+        <div class="modal-container" style="background: white; padding: 20px; text-align: center;">
+            <h3 style="margin-top:0; color:#0058a3;">🔍 盤點數量覆核</h3>
+            <p style="font-size: 14px; color: #333;">商品：<strong id="verifyScanName"></strong></p>
+            <p style="font-size: 14px; color: #666;">系統初盤紀錄：<strong id="verifyScanExpected" style="font-size: 18px; color: #0058a3;"></strong></p>
+            
+            <label style="display: block; margin-top: 15px; margin-bottom: 5px; font-weight: bold;">請輸入本次清點數量：</label>
+            <input type="number" inputmode="decimal" min="0" step="any" id="verifyScanActual" placeholder="輸入實際數量" oninput="window.calculateVerifyDiff()" style="width:100%; padding:10px; border:2px solid #ccc; border-radius:4px; font-size:18px; text-align:center; margin-bottom:10px;">
+            
+            <div id="verifyScanDiff" style="font-weight: bold; font-size: 16px; margin-bottom: 15px; height: 20px;"></div>
+            
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-danger" onclick="cancelVerifyScan()">取消</button>
+                <button class="btn btn-success" onclick="submitVerifyScan()">確認核對</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 簽名畫布彈窗 (新增快速套用區塊) -->
+    <div id="signatureModal" class="modal-overlay hidden" style="z-index: 1200;">
+        <div class="modal-container">
+            <h3>請在下方簽名以核准</h3>
+            <canvas id="sigCanvas"></canvas>
+            
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button class="btn" style="background:#ccc; flex:1;" onclick="clearCanvas()">清除重寫</button>
+                <button class="btn btn-primary" style="flex:2;" onclick="saveSignature()">確認送出</button>
+            </div>
+            
+            <!-- 新增：預設簽名快速套用區塊 -->
+            <div id="defaultSignatureSection" class="hidden" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc;">
+                <p style="font-size:12px; color:#666; margin:0 0 5px 0;">快速套用個人簽名：</p>
+                <button class="btn btn-outline" style="width: 100%; border-style: dashed; padding: 10px;" onclick="useDefaultSignature()">🔏 一鍵套用預設簽名</button>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button class="btn btn-success" style="flex:1; padding: 10px; font-size: 14px;" onclick="saveAsDefaultSignature()">💾 存為預設簽名</button>
+                <button class="btn btn-danger" style="flex:1; padding: 10px; font-size: 14px;" onclick="closeSignaturePad()">取消 (放棄)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 現場臨時新增商品彈窗 -->
+    <div id="onTheFlyModal" class="modal-overlay hidden" style="z-index: 1200;">
+        <div class="modal-container">
+            <h3 style="margin-top:0; color:#0058a3;">➕ 現場臨時新增商品</h3>
+            <p style="font-size: 12px; color: #666; margin-top: -10px; margin-bottom: 15px;">直接加入目前的盤區中</p>
+            <label>貨號 / 條碼：</label>
+            <input type="text" id="flyCode" placeholder="輸入條碼 (若主檔有記錄會自動帶入)" style="margin-bottom:10px; width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+            <label>品名：</label>
+            <input type="text" id="flyName" placeholder="商品品名" style="margin-bottom:10px; width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+            <label>單位 (例:箱/個)：</label>
+            <input type="text" id="flyUnit" value="PC" style="margin-bottom:10px; width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+            <label style="color:#0058a3;">初盤數量：</label>
+            <input type="number" inputmode="decimal" min="0" step="any" id="flyQty" placeholder="請直接輸入盤點數量" style="margin-bottom:20px; width:100%; padding:10px; border:2px solid #0058a3; border-radius:4px; font-weight:bold;">
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-danger" onclick="closeOnTheFlyModal()">取消</button>
+                <button class="btn btn-success" onclick="saveOnTheFlyItem()">確認新增</button>
+            </div>
+        </div>
+    </div>
+
+<!-- ================= 加入 Firebase ES 模組 ================= -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyC4Yu58CX40ybgNeHB-HepYxLga1bIYZpA",
+        authDomain: "stock-count-744d9.firebaseapp.com",
+        projectId: "stock-count-744d9",
+        storageBucket: "stock-count-744d9.firebasestorage.app",
+        messagingSenderId: "164776013050",
+        appId: "1:164776013050:web:2bca7729b2c74c3ecbed43",
+        measurementId: "G-3XJEQ6WJ4C"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    let currentInventoryMonth = new Date().toISOString().slice(0, 7); 
+    let currentDepartment = 'SFM'; 
+    let zoneDepartments = {}; 
+
+    let productDatabase = {};
+    let scannedItems = []; 
+    let knownZones = new Set(); 
+    let zoneStatus = {}; 
+    let inventoryHistory = []; 
+    
+    let systemStartTime = null;
+
+    let html5QrcodeScanner = null;
+    let currentCountMode = 'initial';
+    let currentActiveZone = null; 
+    let currentSignContext = { type: null, targetId: null }; 
+    let activeChecklistCategory = '全部';
+    let activeDashboardCategory = '全部';
+    let lastScanCode = ''; let lastScanTime = 0; let scanMode = 'create';
+    let isFirstLoad = true;
+
+    window.isVerifying = false;
+    window.verifyItemId = null;
+    window.pendingCorrectionQty = null; 
+
+    let sharedAudioCtx = null;
+
+    const connectedRef = ref(db, ".info/connected");
+    onValue(connectedRef, (snap) => {
+        const syncDot = document.querySelector('.sync-dot');
+        const syncText = document.getElementById('syncText');
+        if (snap.val() === true) {
+            syncText.innerText = "即時連線中"; syncDot.style.backgroundColor = "#4CAF50";
+        } else {
+            syncText.innerText = "離線中 (本機儲存)"; syncDot.style.backgroundColor = "#f44336";
+        }
+    });
+
+    onValue(ref(db, 'sfm_inventory_sync'), (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            currentInventoryMonth = data.currentInventoryMonth || new Date().toISOString().slice(0, 7);
+            zoneDepartments = data.zoneDepartments || {};
+            productDatabase = data.productDatabase || {};
+            knownZones = new Set(data.knownZones || []);
+            scannedItems = data.scannedItems || [];
+            scannedItems.forEach(item => { if (!item.correctionHistory) item.correctionHistory = []; });
+            zoneStatus = data.zoneStatus || {};
+            systemStartTime = data.systemStartTime || null;
+            savePersistedDataLocalOnly();
+            updateUI();
+        } else {
+            loadPersistedDataLocalOnly();
+            if (scannedItems.length > 0 || knownZones.size > 0) syncToFirebase(); 
+        }
+        isFirstLoad = false;
+    });
+
+    onValue(ref(db, 'sfm_inventory_history'), (snapshot) => {
+        if(snapshot.val()) {
+            inventoryHistory = snapshot.val();
+            localStorage.setItem('inventory_history', JSON.stringify(inventoryHistory));
+            if (!document.getElementById('tab-history').classList.contains('hidden') && document.getElementById('historyDetailView').classList.contains('hidden')) {
+                window.renderHistoryList();
+            }
+        }
+    });
+
+    function updateUI() {
+        window.updateHeaderMonth();
+        if (!isFirstLoad) {
+            if (!document.getElementById('tab-create').classList.contains('hidden')) { window.renderZoneChecklist(); window.renderCreateListTable(); }
+            if (!document.getElementById('tab-count').classList.contains('hidden')) {
+                if (currentActiveZone) { window.renderZoneItems(); window.renderZoneSignatures(); } else { window.renderZoneDashboard(); }
+            }
+            if (!document.getElementById('tab-dashboard').classList.contains('hidden')) { window.renderDashboard(); }
+        }
+    }
+
+    function savePersistedDataLocalOnly() {
+        localStorage.setItem('inventory_month', currentInventoryMonth);
+        localStorage.setItem('inventory_deptMap', JSON.stringify(zoneDepartments));
+        localStorage.setItem('inventory_db', JSON.stringify(productDatabase));
+        localStorage.setItem('inventory_zones', JSON.stringify([...knownZones]));
+        localStorage.setItem('inventory_items', JSON.stringify(scannedItems));
+        localStorage.setItem('inventory_zoneStatus', JSON.stringify(zoneStatus));
+        if (systemStartTime) localStorage.setItem('inventory_start', systemStartTime);
+    }
+
+    function loadPersistedDataLocalOnly() {
+        const savedMonth = localStorage.getItem('inventory_month');
+        const savedDeptMap = localStorage.getItem('inventory_deptMap');
+        const savedDB = localStorage.getItem('inventory_db');
+        const savedZones = localStorage.getItem('inventory_zones');
+        const savedItems = localStorage.getItem('inventory_items');
+        const savedZoneStatus = localStorage.getItem('inventory_zoneStatus');
+        const savedHistory = localStorage.getItem('inventory_history');
+        const savedStart = localStorage.getItem('inventory_start');
+
+        if (savedMonth) currentInventoryMonth = savedMonth;
+        if (savedDeptMap) zoneDepartments = JSON.parse(savedDeptMap);
+        if (savedDB) productDatabase = JSON.parse(savedDB);
+        if (savedZones) JSON.parse(savedZones).forEach(zone => knownZones.add(zone)); 
+        if (savedItems) scannedItems = JSON.parse(savedItems);
+        if (savedZoneStatus) zoneStatus = JSON.parse(savedZoneStatus);
+        if (savedHistory) inventoryHistory = JSON.parse(savedHistory);
+        if (savedStart) systemStartTime = parseInt(savedStart);
+        window.updateHeaderMonth();
+    }
+
+    function syncToFirebase() {
+        savePersistedDataLocalOnly(); 
+        const syncDot = document.querySelector('.sync-dot'); const syncText = document.getElementById('syncText');
+        syncText.innerText = "同步中..."; syncDot.style.backgroundColor = "#ff9800";
+
+        return set(ref(db, 'sfm_inventory_sync'), {
+            currentInventoryMonth, zoneDepartments, productDatabase, knownZones: [...knownZones], scannedItems, zoneStatus, systemStartTime
+        }).then(() => {
+            syncText.innerText = "已與雲端同步"; syncDot.style.backgroundColor = "#4CAF50";
+            setTimeout(() => { if (navigator.onLine) syncText.innerText = "即時連線中"; }, 2000);
+        }).catch((error) => {
+            syncText.innerText = "⚠️ 同步失敗 (已存本機)"; syncDot.style.backgroundColor = "#f44336";
+        });
+    }
+
+    window.generateUUID = function() {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+        return Date.now().toString(36) + Math.random().toString(36).substring(2);
+    }
+    window.sortZones = function(zonesArray) { return zonesArray.sort(new Intl.Collator('zh-TW', { numeric: true, sensitivity: 'base' }).compare); }
+
+    window.changeMonth = function() {
+        const newMonth = prompt("請設定目前的盤點月份 (例如: 2026-08)", currentInventoryMonth);
+        if (newMonth && newMonth.trim() !== "") { currentInventoryMonth = newMonth.trim(); window.updateHeaderMonth(); syncToFirebase(); }
+    }
+    window.updateHeaderMonth = function() { document.querySelectorAll('.display-month').forEach(el => el.innerText = currentInventoryMonth); }
+
+    window.setDepartment = function(dept) {
+        currentDepartment = dept;
+        document.querySelectorAll('.dept-btn').forEach(btn => { btn.classList.toggle('active', btn.dataset.dept === dept); });
+        window.renderZoneChecklist(); window.renderCreateListTable(); window.renderZoneDashboard();
+    }
+
+    window.playBeep = function() {
+        try { 
+            if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
+            const osc = sharedAudioCtx.createOscillator(); 
+            osc.type = 'sine'; osc.frequency.setValueAtTime(800, sharedAudioCtx.currentTime); 
+            osc.connect(sharedAudioCtx.destination); osc.start(); osc.stop(sharedAudioCtx.currentTime + 0.1); 
+        } catch(e) {}
+        if(navigator.vibrate) navigator.vibrate([100]); 
+    }
+
+    window.exportJsonData = function() {
+        const exportObj = { currentInventoryMonth, zoneDepartments, productDatabase, knownZones: [...knownZones], scannedItems, zoneStatus, inventoryHistory, systemStartTime };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj));
+        const downloadAnchorNode = document.createElement('a'); downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `SFM_SystemBackup_${new Date().toISOString().slice(0,10)}.json`);
+        document.body.appendChild(downloadAnchorNode); downloadAnchorNode.click(); downloadAnchorNode.remove();
+    }
+
+    window.importJsonData = async function(event) {
+        const file = event.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (confirm("⚠️ 警告：即將匯入系統備份檔，此操作將【完全覆蓋】目前的雲端資料！確定要繼續嗎？")) {
+                    currentInventoryMonth = importedData.currentInventoryMonth || new Date().toISOString().slice(0, 7);
+                    zoneDepartments = importedData.zoneDepartments || {}; productDatabase = importedData.productDatabase || {};
+                    knownZones = new Set(importedData.knownZones || []); scannedItems = importedData.scannedItems || [];
+                    zoneStatus = importedData.zoneStatus || {}; inventoryHistory = importedData.inventoryHistory || [];
+                    systemStartTime = importedData.systemStartTime || null;
+
+                    document.getElementById('syncText').innerText = "系統還原中...";
+                    await syncToFirebase();
+                    await set(ref(db, 'sfm_inventory_history'), inventoryHistory);
+                    alert("✅ 完整備份還原成功！"); window.location.reload();
+                }
+            } catch (err) { alert("檔案格式錯誤，匯入失敗。"); }
+        };
+        reader.readAsText(file);
+    }
+
+    window.switchTab = function(tab) {
+        document.getElementById('tab-home').classList.add('hidden'); document.getElementById('tab-create').classList.add('hidden');
+        document.getElementById('tab-count').classList.add('hidden'); document.getElementById('tab-history').classList.add('hidden');
+        document.getElementById('tab-dashboard').classList.add('hidden');
+        document.getElementById(`tab-${tab}`).classList.remove('hidden');
+
+        document.getElementById('navHome').classList.toggle('active', tab === 'home');
+        document.getElementById('navCreate').classList.toggle('active', tab === 'create');
+        document.getElementById('navCount').classList.toggle('active', tab === 'count');
+        document.getElementById('navDashboard').classList.toggle('active', tab === 'dashboard');
+
+        if (tab === 'create') { window.renderZoneChecklist(); window.renderCreateListTable(); } 
+        if (tab === 'count') { window.backToZoneList(); window.stopCameraScanner(); }
+        if (tab === 'dashboard') { window.renderDashboard(); window.stopCameraScanner(); }
+        if (tab === 'history') { window.renderHistoryList(); window.stopCameraScanner(); } 
+        if (tab === 'home') { window.stopCameraScanner(); }
+    }
+
+    window.renderDashboard = function() {
+        const container = document.getElementById('dashIssuesContainer');
+        const activeZonesArray = window.sortZones([...knownZones].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
+        
+        let totalItems = scannedItems.length;
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+        let countedItems = scannedItems.filter(i => !isUncounted(i.initialQty)).length;
+        
+        let finishedZonesCount = 0;
+        let issuesHtml = "";
+
+        let multipleCorrections = scannedItems.filter(i => i.correctionHistory && i.correctionHistory.length > 1);
+        if (multipleCorrections.length > 0) {
+            issuesHtml += `<h4 style="color:#c62828; margin-top:5px; border-bottom:2px solid #ffcdd2; padding-bottom:5px;">🚨 需特別注意：多次更正商品</h4>`;
+            multipleCorrections.forEach(i => {
+                const deptName = (zoneDepartments[i.zone] || 'SFM') === 'REST' ? '🍽️' : '🛒';
+                issuesHtml += `<div class="issue-card" style="background:#ffebee; border-left-color:#f44336; color:#c62828;">
+                    <strong>${deptName} [${i.zone}] - ${i.name}</strong><br>
+                    <span style="font-size:14px;">已被更正 ${i.correctionHistory.length} 次，請店長優先查核！</span>
+                </div>`;
+            });
+            issuesHtml += `<h4 style="color:#0058a3; margin-top:20px; border-bottom:2px solid #ccc; padding-bottom:5px;">⚠️ 待處理盤區清單</h4>`;
+        }
+
+        activeZonesArray.forEach(z => {
+            const isZoneDone = window.checkZoneDone(z);
+            if (isZoneDone) {
+                finishedZonesCount++;
+            } else {
+                const zItems = scannedItems.filter(i => i.zone === z);
+                let reason = [];
+                
+                if (zItems.length === 0) {
+                    reason = ["尚無商品加入清單"];
+                } else {
+                    const uncounted = zItems.filter(i => isUncounted(i.initialQty)).length;
+                    if (uncounted > 0) reason.push(`缺 ${uncounted} 項初盤`);
+                    
+                    const zStat = zoneStatus[z] || {};
+                    if (!zStat.sign_zoneInitial) reason.push("缺初盤簽名");
+                    if (!zStat.sign_zoneRecount) reason.push("缺覆盤簽名");
+                    if (!zStat.sign_zoneRandom) reason.push("缺抽盤簽名");
+                    
+                    const unRecounted = zItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
+                    if (unRecounted > 0) reason.push(`缺 ${unRecounted} 項覆盤確認`);
+                    const unRandomed = zItems.filter(i => i.isRandomChecked && !i.randomDone).length;
+                    if (unRandomed > 0) reason.push(`缺 ${unRandomed} 項抽盤確認`);
+                }
+
+                const deptName = (zoneDepartments[z] || 'SFM') === 'REST' ? '🍽️ 餐廳' : '🛒 超市';
+                issuesHtml += `<div class="issue-card">
+                    <strong>[${deptName}] 📍 ${z}</strong><br>
+                    <span style="font-size:14px;">${reason.join("、")}</span>
+                </div>`;
+            }
+        });
+
+        const percent = activeZonesArray.length > 0 ? Math.round((finishedZonesCount / activeZonesArray.length) * 100) : 0;
+        document.getElementById('dashTotalPercent').innerText = `${percent}%`;
+        document.getElementById('dashProgressBar').style.width = `${percent}%`;
+        document.getElementById('dashZoneStats').innerText = `已嚴謹驗收 ${finishedZonesCount} / ${activeZonesArray.length} 區`;
+        document.getElementById('dashItemStats').innerText = `已完成初盤 ${countedItems} / ${totalItems} 項`;
+
+        let etaHtml = "";
+        let remainingItemsToCount = totalItems - countedItems;
+        if (systemStartTime && countedItems > 0 && finishedZonesCount < activeZonesArray.length) {
+            let elapsedMs = Date.now() - systemStartTime;
+            let msPerItem = elapsedMs / countedItems;
+            let msRemaining = msPerItem * remainingItemsToCount;
+            let minsRemaining = Math.max(1, Math.round(msRemaining / 60000));
+            let timeStr = minsRemaining >= 60 ? `${Math.floor(minsRemaining/60)} 小時 ${minsRemaining%60} 分鐘` : `${minsRemaining} 分鐘`;
+            etaHtml = `<span style="color:#ffeb3b;">⏳ 預估剩餘時間：約 ${timeStr}</span>`;
+        } else if (finishedZonesCount === activeZonesArray.length && activeZonesArray.length > 0) {
+            etaHtml = `<span style="color:#4CAF50;">✅ 盤點已全數完成！</span>`;
+        } else {
+            etaHtml = `<span style="color:#ccc;">⏳ 預估時間：完成首項後計算</span>`;
+        }
+        document.getElementById('dashETA').innerHTML = etaHtml;
+
+        if (issuesHtml === "") {
+            container.innerHTML = "<div style='text-align:center; color:#155724; background:#d4edda; padding:20px; border-radius:8px;'>🏆 恭喜！全館盤區皆已嚴謹驗收完成，可準備結算匯出！</div>";
+        } else {
+            container.innerHTML = issuesHtml;
+        }
+    }
+
+    window.getZoneCategory = function(zoneName) {
+        if (!zoneName) return '其他'; const upperZone = zoneName.toUpperCase();
+        if (upperZone.includes('收貨區')) return '收貨區'; if (upperZone.includes('4樓') || upperZone.includes('4F')) return '4樓';
+        if (upperZone.startsWith('BIS')) return 'BIS'; if (upperZone.startsWith('BUF')) return 'BUF'; if (upperZone.startsWith('STO')) return 'STO';
+        if (upperZone.startsWith('SFM')) {
+            const match = upperZone.match(/SFM(\d+)/);
+            if (match) { const num = parseInt(match[1], 10); if (num <= 30) return 'SFM (1-30)'; else return 'SFM (31-60)'; } return 'SFM'; 
+        } return '其他';
+    }
+
+    window.renderTabs = function(zonesArray, containerId, activeCategory, clickFunctionName) {
+        const container = document.getElementById(containerId); if (zonesArray.length === 0) { container.innerHTML = ""; return; }
+        const categories = new Set(['全部']); zonesArray.forEach(z => categories.add(window.getZoneCategory(z)));
+        const order = ['全部', 'BIS', 'SFM (1-30)', 'SFM (31-60)', 'SFM', 'BUF', 'STO', '收貨區', '4樓', '其他'];
+        const sortedCategories = [...categories].sort((a, b) => { let indexA = order.indexOf(a); let indexB = order.indexOf(b); if(indexA === -1) indexA = 99; if(indexB === -1) indexB = 99; return indexA - indexB; });
+        let html = ''; sortedCategories.forEach(cat => { const isActive = cat === activeCategory ? 'active' : ''; html += `<button class="cat-tab ${isActive}" onclick="window.${clickFunctionName}('${cat}')">${cat}</button>`; });
+        container.innerHTML = html;
+    }
+
+    window.setChecklistCategory = function(category) { activeChecklistCategory = category; window.renderZoneChecklist(); }
+
+    window.jumpToZone = function(zoneName) {
+        document.getElementById('zoneInput').value = zoneName; let prefix = '自訂'; let suffix = '';
+        const prefixes = ['SFM', 'BIS', 'BUF', 'STO', '收貨區', '4樓'];
+        for (let p of prefixes) { if (zoneName.startsWith(p)) { prefix = p; suffix = zoneName.substring(p.length); break; } }
+        document.querySelectorAll('#quickZoneCategories .cat-tab').forEach(btn => { btn.classList.toggle('active', btn.innerText.includes(prefix)); });
+        const prefixInput = document.getElementById('quickZonePrefix'); const suffixInput = document.getElementById('quickZoneSuffix'); const zoneInput = document.getElementById('zoneInput');
+
+        if (prefix === '自訂') {
+            prefixInput.value = ''; suffixInput.value = ''; prefixInput.disabled = true; suffixInput.disabled = true;
+            zoneInput.readOnly = false; zoneInput.style.background = '#fff';
+        } else {
+            prefixInput.value = prefix; suffixInput.value = suffix; zoneInput.readOnly = true; zoneInput.style.background = '#e8f5e9';
+            if(['收貨區', '4樓'].includes(prefix)) { suffixInput.disabled = true; suffixInput.style.background = '#eee'; } 
+            else { suffixInput.disabled = false; suffixInput.style.background = '#fff'; }
+        }
+        window.renderCreateListTable(); document.getElementById('zoneSpecificTableContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    window.selectQuickZonePrefix = function(prefix) {
+        document.querySelectorAll('#quickZoneCategories .cat-tab').forEach(btn => btn.classList.toggle('active', btn.innerText.includes(prefix)));
+        const prefixInput = document.getElementById('quickZonePrefix'); const suffixInput = document.getElementById('quickZoneSuffix'); const zoneInput = document.getElementById('zoneInput');
+        if (prefix === '自訂') {
+            prefixInput.value = ''; suffixInput.value = ''; prefixInput.disabled = true; suffixInput.disabled = true;
+            zoneInput.readOnly = false; zoneInput.value = ''; zoneInput.placeholder = '請手動輸入完整名稱...'; zoneInput.style.background = '#fff'; zoneInput.focus();
+        } else {
+            zoneInput.readOnly = true; zoneInput.style.background = '#e8f5e9'; prefixInput.value = prefix;
+            if(['收貨區', '4樓'].includes(prefix)) { suffixInput.value = ''; suffixInput.disabled = true; suffixInput.style.background = '#eee'; } 
+            else { suffixInput.disabled = false; suffixInput.style.background = '#fff'; suffixInput.focus(); }
+            window.updateFinalZone();
+        }
+        window.renderCreateListTable(); 
+    }
+
+    window.updateFinalZone = function() {
+        const prefix = document.getElementById('quickZonePrefix').value; let suffix = document.getElementById('quickZoneSuffix').value;
+        if(suffix && !['收貨區', '4樓'].includes(prefix)) suffix = suffix.padStart(3, '0');
+        document.getElementById('zoneInput').value = prefix + (suffix || ''); window.renderCreateListTable(); 
+    }
+    window.updateCustomZone = function() { window.renderCreateListTable(); }
+
+    window.renderZoneChecklist = function() {
+        const deptZones = [...knownZones].filter(z => (zoneDepartments[z] || 'SFM') === currentDepartment);
+        const zonesArray = window.sortZones(deptZones); 
+        window.renderTabs(zonesArray, 'checklistTabsContainer', activeChecklistCategory, 'setChecklistCategory');
+
+        const container = document.getElementById('zoneChecklistContainer'); const statusContainer = document.getElementById('checklistOverallStatus');
+        if (zonesArray.length === 0) { container.innerHTML = "<p style='color:#666; font-size:14px;'>本部門尚未匯入或建立任何盤區。</p>"; statusContainer.innerHTML = ""; return; }
+
+        if (activeChecklistCategory === '全部') {
+            let readyZonesCount = 0;
+            zonesArray.forEach(z => {
+                const hasItems = scannedItems.some(item => item.zone === z);
+                if (hasItems || (zoneStatus[z] && zoneStatus[z].isSkipped)) readyZonesCount++;
+            });
+            if (readyZonesCount === zonesArray.length) { statusContainer.innerHTML = `<div class="overall-status overall-complete">✅ 本部門盤單已全部完成 (${readyZonesCount}/${zonesArray.length})</div>`; } 
+            else { statusContainer.innerHTML = `<div class="overall-status overall-pending">⏳ 盤單製作未完成 (本部門已確認 ${readyZonesCount}/${zonesArray.length} 區)</div>`; }
+        } else { statusContainer.innerHTML = ""; }
+
+        let filteredZones = activeChecklistCategory !== '全部' ? zonesArray.filter(z => window.getZoneCategory(z) === activeChecklistCategory) : zonesArray;
+        if (filteredZones.length === 0) { container.innerHTML = `<p style='color:#666; font-size:14px;'>在此分類下無盤區資料。</p>`; return; }
+
+        let html = '<table class="checklist-table"><thead><tr><th>盤區名稱</th><th>目前狀態</th><th>操作</th></tr></thead><tbody>';
+        filteredZones.forEach(zone => {
+            if (!zoneStatus[zone]) zoneStatus[zone] = { isSkipped: false, sign_zoneInitial: null, sign_zoneRecount: null, sign_zoneRandom: null };
+            const hasItems = scannedItems.some(item => item.zone === zone);
+            let statusBadge = ""; let actionBtn = "";
+            if (hasItems) { statusBadge = '<span class="status-badge status-green">🟢 已加商品</span>'; actionBtn = '<span style="color:#aaa; font-size:12px;">(正常)</span>'; zoneStatus[zone].isSkipped = false; } 
+            else if (zoneStatus[zone].isSkipped) { statusBadge = '<span class="status-badge status-grey">⚪ 不盤點</span>'; actionBtn = `<button class="btn btn-outline" style="padding:4px; font-size:12px; margin:0;" onclick="window.toggleZoneSkip('${zone}')">恢復</button>`; } 
+            else { statusBadge = '<span class="status-badge status-red">🔴 空盤區</span>'; actionBtn = `<button class="btn" style="background:#e0e0e0; padding:4px; font-size:12px; margin:0;" onclick="window.toggleZoneSkip('${zone}')">設為不盤</button>`; }
+            html += `<tr><td style="font-weight:bold; color:#0058a3; cursor:pointer; text-decoration:underline;" onclick="window.jumpToZone('${zone}')">${zone}</td><td>${statusBadge}</td><td>${actionBtn}</td></tr>`;
+        });
+        html += '</tbody></table>'; container.innerHTML = html;
+        savePersistedDataLocalOnly(); 
+    }
+
+    window.toggleZoneSkip = function(zone) { if (zoneStatus[zone]) { zoneStatus[zone].isSkipped = !zoneStatus[zone].isSkipped; syncToFirebase(); window.renderZoneChecklist(); } }
+
+    window.setDashboardCategory = function(category) { activeDashboardCategory = category; window.renderZoneDashboard(); }
+    window.backToZoneList = function() { currentActiveZone = null; document.getElementById('view-zone-detail').classList.add('hidden'); document.getElementById('view-zone-list').classList.remove('hidden'); window.renderZoneDashboard(); }
+
+    window.checkZoneDone = function(z) {
+        const itemsInZone = scannedItems.filter(i => i.zone === z); if (itemsInZone.length === 0) return false;
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+        const allItemsCounted = itemsInZone.every(i => !isUncounted(i.initialQty));
+        const allRecountsDone = itemsInZone.every(i => i.recountDone);
+        const randomItems = itemsInZone.filter(i => i.isRandomChecked);
+        const allRandomsDone = randomItems.length === 0 || randomItems.every(i => i.randomDone);
+        const zStat = zoneStatus[z] || {}; const hasAllSigns = !!zStat.sign_zoneInitial && !!zStat.sign_zoneRecount && !!zStat.sign_zoneRandom;
+        
+        if (allItemsCounted && allRecountsDone && allRandomsDone && hasAllSigns) {
+            if (!zoneStatus[z].completedAt) { zoneStatus[z].completedAt = Date.now(); syncToFirebase(); }
+            return true;
+        }
+        return false;
+    }
+
+    window.updateModeUI = function() {
+        if (!currentActiveZone) return;
+        const zoneItems = scannedItems.filter(i => i.zone === currentActiveZone);
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+        const unCounted = zoneItems.filter(i => isUncounted(i.initialQty)).length;
+        const unRecounted = zoneItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
+        
+        const btnRandom = document.getElementById('btnModeRandom');
+        const hintEl = document.getElementById('modeStatusHint');
+        let hintTexts = [];
+        
+        if (unCounted > 0 || unRecounted > 0) {
+            btnRandom.disabled = true;
+            if (unCounted > 0) hintTexts.push(`缺 ${unCounted} 項初盤`);
+            if (unRecounted > 0) hintTexts.push(`缺 ${unRecounted} 項覆核`);
+        } else {
+            btnRandom.disabled = false;
+        }
+        
+        if (currentCountMode === 'recount' && unCounted > 0) {
+            hintEl.innerHTML = `⚠️ 尚有 ${unCounted} 項未初盤，已暫時隱藏`;
+            hintEl.style.color = '#ff9800';
+        } else if (currentCountMode === 'random' && hintTexts.length > 0) {
+            hintEl.innerHTML = `⚠️ 無法抽盤：${hintTexts.join('、')}`;
+            hintEl.style.color = '#f44336';
+        } else if (hintTexts.length > 0) {
+            hintEl.innerHTML = `📌 抽盤鎖定中：${hintTexts.join('、')}`;
+            hintEl.style.color = '#888';
+        } else {
+            hintEl.innerHTML = `✅ 全區覆核完成，可進行抽盤。`;
+            hintEl.style.color = '#4CAF50';
+        }
+    }
+
+    window.renderZoneDashboard = function() {
+        const activeZonesArray = window.sortZones([...new Set(scannedItems.map(i => i.zone))].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped) && (zoneDepartments[z] || 'SFM') === currentDepartment));
+        window.renderTabs(activeZonesArray, 'dashboardTabsContainer', activeDashboardCategory, 'setDashboardCategory');
+
+        const container = document.getElementById('zoneDashboardContainer'); const statusContainer = document.getElementById('dashboardOverallStatus');
+        if (activeZonesArray.length === 0) { container.innerHTML = "<p style='text-align:center; color:#666;'>本部門無需要盤點的區域。</p>"; statusContainer.innerHTML = ""; return; }
+
+        if (activeDashboardCategory === '全部') {
+            let finishedZonesCount = 0; activeZonesArray.forEach(z => { if (window.checkZoneDone(z)) finishedZonesCount++; });
+            if (finishedZonesCount === activeZonesArray.length) { statusContainer.innerHTML = `<div class="overall-status overall-complete">🏆 本部門盤點與簽核皆已完成 (${finishedZonesCount}/${activeZonesArray.length})</div>`; } 
+            else { statusContainer.innerHTML = `<div class="overall-status overall-pending">⏳ 本部門盤點進行中 (已驗收 ${finishedZonesCount}/${activeZonesArray.length} 區)</div>`; }
+        } else { statusContainer.innerHTML = ""; }
+
+        let filteredZones = activeDashboardCategory !== '全部' ? activeZonesArray.filter(z => window.getZoneCategory(z) === activeDashboardCategory) : activeZonesArray;
+        if (filteredZones.length === 0) { container.innerHTML = `<p style='text-align:center; color:#666;'>此分類下目前沒有需盤點的區域。</p>`; return; }
+
+        container.innerHTML = "";
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+        
+        filteredZones.forEach(zone => {
+            const isZoneDone = window.checkZoneDone(zone);
+            const itemsInZone = scannedItems.filter(i => i.zone === zone);
+            const completedCount = itemsInZone.filter(i => !isUncounted(i.initialQty)).length;
+            let badgeClass = "zone-badge pending"; let badgeText = `⏳ 剩 ${itemsInZone.length - completedCount} 項未盤`;
+            if (completedCount === itemsInZone.length) { if (isZoneDone) { badgeClass = "zone-badge complete"; badgeText = "✅ 已完成驗收"; } else { badgeClass = "zone-badge pending"; badgeText = "⚠️ 待簽核"; } }
+            container.insertAdjacentHTML('beforeend', `<button class="zone-btn" onclick="window.openZoneDetail('${zone}')"><span class="zone-btn-title">📍 ${zone}</span><span class="${badgeClass}">${badgeText}</span></button>`);
+        });
+    }
+
+    window.exportToExcel = function() {
+        if (scannedItems.length === 0) { alert("目前沒有盤點資料可供匯出！"); return; }
+        
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+        let incompleteZones = [];
+        const activeZones = window.sortZones([...new Set(scannedItems.map(i=>i.zone))].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
+        
+        activeZones.forEach(z => {
+            if(!window.checkZoneDone(z)) {
+                const zItems = scannedItems.filter(i => i.zone === z);
+                let reason = [];
+                if (zItems.length === 0) {
+                    reason.push("尚無商品加入清單");
+                } else {
+                    const uncounted = zItems.filter(i => isUncounted(i.initialQty)).length;
+                    if (uncounted > 0) reason.push(`缺 ${uncounted} 項初盤`);
+                    const zStat = zoneStatus[z] || {};
+                    if (!zStat.sign_zoneInitial || !zStat.sign_zoneRecount || !zStat.sign_zoneRandom) reason.push(`負責人未簽齊`);
+                    const unRecounted = zItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
+                    if (unRecounted > 0) reason.push(`缺 ${unRecounted} 項覆盤確認`);
+                    const unRandomed = zItems.filter(i => i.isRandomChecked && !i.randomDone).length;
+                    if (unRandomed > 0) reason.push(`缺 ${unRandomed} 項抽盤確認`);
+                }
+                incompleteZones.push(`[${z}] ${reason.join("、")}`);
+            }
+        });
+
+        if (incompleteZones.length > 0) {
+            const confirmMsg = "⚠️ 警告：全館盤點尚有未完成的項目，確定要強制結算匯出嗎？\n\n未完成清單範例：\n" + incompleteZones.slice(0, 5).join("\n") + (incompleteZones.length > 5 ? "\n...等" : "");
+            if(!confirm(confirmMsg)) return;
+        }
+
+        const exportData = scannedItems.map(item => {
+            const zStat = zoneStatus[item.zone] || {};
+            const deptName = (zoneDepartments[item.zone] || 'SFM') === 'REST' ? 'IKEA餐廳' : '超市與美食小站';
+            const initialQtyStr = !isUncounted(item.initialQty) ? item.initialQty : "未盤";
+            return {
+                "部門": deptName, "盤區": item.zone, "貨號": item.code, "品名": item.name, "單位": item.unit,
+                "初盤數量": initialQtyStr, "更正次數": (item.correctionHistory ? item.correctionHistory.length : 0),
+                "抽盤對象": item.isRandomChecked ? "是" : "否",
+                "盤區初盤簽核": zStat.sign_zoneInitial ? "已簽" : "未簽", "盤區覆盤簽核": zStat.sign_zoneRecount ? "已簽" : "未簽", "盤區抽盤簽核": zStat.sign_zoneRandom ? "已簽" : "未簽"
+            };
+        });
+        const ws = XLSX.utils.json_to_sheet(exportData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "盤點結算");
+        XLSX.writeFile(wb, `全館盤點結算_${currentInventoryMonth}.xlsx`);
+        
+        setTimeout(() => {
+            if(confirm("✅ 結算 Excel 已下載！\n請問是否要將本次全館盤點資料【封存至歷史紀錄】，並清空清單以準備次月作業？")) {
+                let monthStr; let isUnique = false;
+                while (!isUnique) {
+                    monthStr = prompt("請設定本次封存的月份名稱 (預設為當前月份)", currentInventoryMonth);
+                    if (monthStr === null) return; 
+                    if (inventoryHistory.some(h => h.month === monthStr)) { alert("❌ 此月份名稱已存在！請輸入不同的名稱避免覆蓋。"); } else { isUnique = true; }
+                }
+
+                inventoryHistory.push({
+                    month: monthStr, timestamp: new Date().toLocaleString('zh-TW'),
+                    items: JSON.parse(JSON.stringify(scannedItems)), zoneStatus: JSON.parse(JSON.stringify(zoneStatus)),
+                    zoneDepartments: JSON.parse(JSON.stringify(zoneDepartments))
+                });
+
+                scannedItems = []; systemStartTime = null;
+                for(let z in zoneStatus) { zoneStatus[z] = { isSkipped: false, sign_zoneInitial: null, sign_zoneRecount: null, sign_zoneRandom: null }; }
+                
+                set(ref(db, 'sfm_inventory_history'), inventoryHistory).then(()=>{
+                    syncToFirebase(); window.renderCreateListTable(); alert("✅ 封存成功！系統已重置。");
+                }).catch((err)=>{ alert("⚠️ 封存失敗，已暫存於本機，請檢查網路連線。"); console.error(err); });
+            }
+        }, 1000);
+    }
+
+    window.renderHistoryList = function() {
+        document.getElementById('historyListView').classList.remove('hidden'); document.getElementById('historyDetailView').classList.add('hidden');
+        const container = document.getElementById('historyListContainer');
+        if(inventoryHistory.length === 0) { container.innerHTML = "<p style='text-align:center; color:#666; padding:20px;'>目前尚未有任何歷史盤點紀錄。</p>"; return; }
+        let html = '';
+        [...inventoryHistory].reverse().forEach((record, index) => {
+            const originalIndex = inventoryHistory.length - 1 - index;
+            html += `<button class="zone-btn" style="border-color: #9c27b0;" onclick="window.viewHistoryDetail(${originalIndex})">
+                    <span class="zone-btn-title" style="color: #9c27b0;">📅 ${record.month} 全館盤點明細</span>
+                    <span class="zone-badge" style="background: #f3e5f5; color: #7b1fa2;">共 ${record.items.length} 項</span></button>`;
+        });
+        container.innerHTML = html;
+    }
+
+    window.viewHistoryDetail = function(index) {
+        const record = inventoryHistory[index];
+        document.getElementById('historyListView').classList.add('hidden'); document.getElementById('historyDetailView').classList.remove('hidden');
+        document.getElementById('historyDetailTitle').innerText = `${record.month} 盤點明細`;
+        document.getElementById('btnDeleteHistory').onclick = function() { window.deleteHistoryRecord(index); };
+
+        const tableBody = document.getElementById('historyDetailTableBody'); let html = '';
+        const sortedItems = [...record.items].sort((a, b) => a.zone.localeCompare(b.zone));
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+
+        sortedItems.forEach(item => { 
+            const deptName = (record.zoneDepartments && record.zoneDepartments[item.zone] === 'REST') ? '餐廳' : '超市';
+            const qtyStr = !isUncounted(item.initialQty) ? item.initialQty : '-';
+            html += `<tr><td style="color:#888;">${deptName}</td><td style="font-weight:bold; color:#555;">${item.zone}</td><td>${item.code}</td><td>${item.name}</td><td style="text-align:center; font-weight:bold; color:#0058a3;">${qtyStr}</td></tr>`; 
+        });
+        tableBody.innerHTML = html;
+
+        const sigContainer = document.getElementById('historySignatures');
+        let sigHtml = '<h4 style="color:#9c27b0;">📝 盤區簽核紀錄</h4><div style="display:flex; flex-wrap:wrap; gap:10px;">';
+        if (record.zoneStatus) {
+            for (let z in record.zoneStatus) {
+                const zStat = record.zoneStatus[z];
+                if (zStat.sign_zoneInitial || zStat.sign_zoneRecount || zStat.sign_zoneRandom) {
+                    sigHtml += `<div style="background:white; padding:10px; border-radius:6px; border:1px solid #ddd; min-width:120px;">
+                        <strong style="display:block; margin-bottom:5px; color:#555;">${z}</strong>
+                        ${zStat.sign_zoneInitial ? `<img src="${zStat.sign_zoneInitial}" style="height:30px; display:block; margin-bottom:2px;" title="初盤">` : ''}
+                        ${zStat.sign_zoneRecount ? `<img src="${zStat.sign_zoneRecount}" style="height:30px; display:block; margin-bottom:2px;" title="覆盤">` : ''}
+                        ${zStat.sign_zoneRandom ? `<img src="${zStat.sign_zoneRandom}" style="height:30px; display:block;" title="抽盤">` : ''}
+                    </div>`;
+                }
+            }
+        }
+        sigHtml += '</div>'; sigContainer.innerHTML = sigHtml;
+    }
+
+    window.deleteHistoryRecord = function(index) {
+        if(confirm("⚠️ 警告：確定要永久刪除這筆歷史紀錄嗎？刪除後無法復原。")) {
+            inventoryHistory.splice(index, 1); 
+            localStorage.setItem('inventory_history', JSON.stringify(inventoryHistory));
+            set(ref(db, 'sfm_inventory_history'), inventoryHistory)
+                .then(() => { window.backToHistoryList(); window.renderHistoryList(); })
+                .catch((err) => { alert("⚠️ 刪除失敗，請檢查網路連線後再試一次。"); console.error(err); });
+        }
+    }
+    window.backToHistoryList = function() { document.getElementById('historyListView').classList.remove('hidden'); document.getElementById('historyDetailView').classList.add('hidden'); }
+
+    window.handleFileUpload = function(event) {
+        const file = event.target.files[0]; if (!file) return;
+        const shouldImportItems = document.getElementById('importItemsCheckbox').checked;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+            if (workbook.Sheets['SETTING']) {
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['SETTING'], { header: 1 });
+                for (let i = 1; i < rows.length; i++) {
+                    if (rows[i].length > 0 && rows[i][0]) productDatabase[String(rows[i][0]).trim()] = { name: rows[i][1] ? String(rows[i][1]).trim() : "未知名稱", unit: rows[i][2] ? String(rows[i][2]).trim() : "PC" };
+                }
+            }
+
+            let importedItemsCount = 0;
+            workbook.SheetNames.forEach(sheetName => {
+                if (!['SETTING', 'display bin', '工作表1'].includes(sheetName)) {
+                    knownZones.add(sheetName); 
+                    if(!zoneDepartments[sheetName]) zoneDepartments[sheetName] = currentDepartment;
+
+                    if (shouldImportItems) {
+                        const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+                        let headerIdx = -1; let itemColIdx = -1; let nameColIdx = -1;
+                        for (let r = 0; r < sheetData.length; r++) {
+                            if (sheetData[r]) {
+                                const rowStr = sheetData[r].join("");
+                                if (rowStr.includes("貨號") || rowStr.includes("品名")) { headerIdx = r; itemColIdx = sheetData[r].findIndex(cell => String(cell).includes("貨號")); nameColIdx = sheetData[r].findIndex(cell => String(cell).includes("品名")); break; }
+                            }
+                        }
+                        if (headerIdx !== -1 && itemColIdx !== -1) {
+                            for (let r = headerIdx + 1; r < sheetData.length; r++) {
+                                const row = sheetData[r];
+                                if (row && row[itemColIdx]) {
+                                    const code = String(row[itemColIdx]).trim();
+                                    if (code && code !== "NaN" && code !== "undefined") {
+                                        const dbInfo = productDatabase[code];
+                                        const name = dbInfo ? dbInfo.name : (row[nameColIdx] ? String(row[nameColIdx]).trim() : "未知名稱");
+                                        const unit = dbInfo ? dbInfo.unit : "PC";
+                                        const isDuplicate = scannedItems.some(i => i.zone === sheetName && i.code === code);
+                                        if(!isDuplicate) {
+                                            scannedItems.push({ 
+                                                id: window.generateUUID(), code: code, name: name, unit: unit, zone: sheetName, 
+                                                initialQty: "", isRandomChecked: false, recountDone: false, randomDone: false, correctionHistory: []
+                                            });
+                                            importedItemsCount++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            syncToFirebase(); 
+            let msg = `✅ Excel 匯入成功！\n- 盤區已加入【${currentDepartment === 'REST' ? 'IKEA 餐廳' : '超市與美食小站'}】。`;
+            if (shouldImportItems) msg += `\n- 載入了 ${importedItemsCount} 項預設商品。`; alert(msg);
+            if(!document.getElementById('tab-create').classList.contains('hidden')) { window.renderZoneChecklist(); window.renderCreateListTable(); }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    window.processScan = function() {
+        const codeInput = document.getElementById('itemCodeInput'); const code = codeInput.value.trim(); const zone = document.getElementById('zoneInput').value.trim();
+        if (!zone) { alert("請先在第二步建立或確認『盤點區域』！"); return; }
+        if (!code) return;
+        knownZones.add(zone);
+        if(!zoneDepartments[zone]) zoneDepartments[zone] = currentDepartment; 
+        if (productDatabase[code]) { window.addToInventoryList(code, productDatabase[code].name, productDatabase[code].unit, zone); codeInput.value = ""; } 
+        else { document.getElementById('manualAddSection').classList.remove('hidden'); document.getElementById('manualCode').value = code; }
+    }
+
+    window.saveManualItem = function() {
+        const code = document.getElementById('manualCode').value; const name = document.getElementById('manualName').value.trim(); const unit = document.getElementById('manualUnit').value.trim(); const zone = document.getElementById('zoneInput').value.trim();
+        if(!name || !unit) { alert("請完整輸入商品資訊！"); return; }
+        productDatabase[code] = { name: name, unit: unit }; window.addToInventoryList(code, name, unit, zone);
+        document.getElementById('manualAddSection').classList.add('hidden'); document.getElementById('itemCodeInput').value = "";
+    }
+    window.cancelManualItem = function() { document.getElementById('manualAddSection').classList.add('hidden'); }
+
+    window.addToInventoryList = function(code, name, unit, zone, initialQty = "") {
+        scannedItems.push({ id: window.generateUUID(), code: code, name: name, unit: unit, zone: zone, initialQty: initialQty, isRandomChecked: false, recountDone: false, randomDone: false, correctionHistory: [] });
+        syncToFirebase(); window.renderCreateListTable(); window.renderZoneChecklist(); 
+    }
+
+    window.deleteItem = function(itemId) {
+        if(confirm("確定要將這個商品從清單中刪除嗎？")) { scannedItems = scannedItems.filter(item => item.id !== itemId); syncToFirebase(); window.renderCreateListTable(); window.renderZoneChecklist(); }
+    }
+
+    window.renderCreateListTable = function() {
+        const tableBody = document.getElementById('tableBody'); tableBody.innerHTML = "";
+        const currentZone = document.getElementById('zoneInput').value.trim();
+        const filteredItems = currentZone ? scannedItems.filter(item => item.zone === currentZone) : [];
+        const table = document.getElementById('inventoryTable'); const emptyMsg = document.getElementById('emptyTableMsg');
+
+        if (filteredItems.length === 0) { table.classList.add('hidden'); emptyMsg.classList.remove('hidden'); } 
+        else {
+            table.classList.remove('hidden'); emptyMsg.classList.add('hidden');
+            filteredItems.forEach(item => {
+                tableBody.insertAdjacentHTML('beforeend', `<tr><td>${item.zone}</td><td>${item.code}</td><td>${item.name}</td><td style="text-align:center;"><button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px; margin: 0; width: auto;" onclick="window.deleteItem('${item.id}')">刪除</button></td></tr>`);
+            });
+        }
+    }
+
+    window.startCameraScanner = async function(mode) {
+        scanMode = mode;
+        const modal = document.getElementById('cameraModal');
+        
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+            await html5QrcodeScanner.stop(); html5QrcodeScanner.clear();
+        }
+
+        modal.classList.remove('hidden');
+        document.getElementById('cameraModalTitle').innerText = mode === 'create' ? "掃描新增商品" : `以掃代打 (${currentCountMode === 'initial' ? '累加初盤' : '覆核比對'})`;
+        document.getElementById('cameraModalSubtitle').innerText = mode === 'create' ? "將加入盤單清單中" : "鏡頭對準條碼，自動執行動作";
+
+        html5QrcodeScanner = new Html5Qrcode("reader");
+        html5QrcodeScanner.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 250, height: 100 }, formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A ] }, 
+            (txt) => { 
+                if (window.isVerifying) return; // 相機鎖定防呆
+                if (txt === lastScanCode && (Date.now() - lastScanTime) < 1500) return;
+                lastScanCode = txt; lastScanTime = Date.now(); window.playBeep();
+                if (scanMode === 'create') { document.getElementById('itemCodeInput').value = txt; window.processScan(); } 
+                else if (scanMode === 'count') { window.processCountScan(txt); }
+            }, 
+            () => {}
+        ).catch(() => { alert("無法開啟相機。請確認權限或連線安全性。"); window.stopCameraScanner(); });
+    }
+
+    window.stopCameraScanner = function() { 
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) { html5QrcodeScanner.stop().then(() => { document.getElementById('cameraModal').classList.add('hidden'); }); } 
+        else { document.getElementById('cameraModal').classList.add('hidden'); }
+    }
+
+    window.calculateVerifyDiff = function() {
+        const actualInput = document.getElementById('verifyScanActual').value;
+        const diffEl = document.getElementById('verifyScanDiff');
+        if (actualInput === '') { diffEl.innerText = ''; return; }
+        
+        const actualQty = parseFloat(actualInput);
+        const expectedQty = parseFloat(document.getElementById('verifyScanExpected').innerText) || 0;
+        const diff = actualQty - expectedQty;
+        
+        if (diff > 0) {
+            diffEl.style.color = '#0058a3'; 
+            diffEl.innerText = `差異：+${diff}`;
+        } else if (diff < 0) {
+            diffEl.style.color = '#f44336'; 
+            diffEl.innerText = `差異：${diff}`;
+        } else {
+            diffEl.style.color = '#4CAF50'; 
+            diffEl.innerText = `數量相符`;
+        }
+    }
+
+    window.processCountScan = function(code) {
+        const item = scannedItems.find(i => i.zone === currentActiveZone && i.code === code);
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+
+        if (item) {
+            if (currentCountMode === 'initial') {
+                item.initialQty = (parseFloat(item.initialQty) || 0) + 1; 
+                if (!systemStartTime) systemStartTime = Date.now();
+                syncToFirebase(); window.renderZoneItems();
+            } else if (currentCountMode === 'recount' || currentCountMode === 'random') {
+                if (currentCountMode === 'random' && !item.isRandomChecked) {
+                    alert("⚠️ 此商品未列入本次抽盤名單！"); return;
+                }
+                if (isUncounted(item.initialQty)) {
+                    alert("⚠️ 此商品尚未完成初盤，無法進行覆核！請先切換至初盤模式輸入數量。"); return;
+                }
+                
+                window.isVerifying = true; window.verifyItemId = item.id;
+                document.getElementById('verifyScanName').innerText = item.name;
+                document.getElementById('verifyScanExpected').innerText = item.initialQty;
+                document.getElementById('verifyScanActual').value = '';
+                document.getElementById('verifyScanDiff').innerText = ''; 
+                document.getElementById('verifyScanModal').classList.remove('hidden');
+            }
+        } else {
+            if (currentCountMode !== 'initial') { alert("⚠️ 覆盤/抽盤模式下，掃描到不在清單內的商品！請切換回初盤模式新增。"); return; }
+            if (productDatabase[code]) {
+                scannedItems.push({ id: window.generateUUID(), code: code, name: productDatabase[code].name, unit: productDatabase[code].unit, zone: currentActiveZone, initialQty: 1, isRandomChecked: false, recountDone: false, randomDone: false, correctionHistory: [] });
+                if (!systemStartTime) systemStartTime = Date.now();
+                syncToFirebase(); window.renderZoneItems();
+            } else {
+                window.stopCameraScanner(); document.getElementById('flyCode').value = code; document.getElementById('flyName').value = ''; document.getElementById('flyUnit').value = 'PC'; document.getElementById('flyQty').value = '1'; document.getElementById('onTheFlyModal').classList.remove('hidden');
+            }
+        }
+    }
+
+    window.submitVerifyScan = function() {
+        const actualQty = parseFloat(document.getElementById('verifyScanActual').value);
+        if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的數量！"); return; }
+        
+        const item = scannedItems.find(i => i.id === window.verifyItemId);
+        if (!item) {
+            alert("⚠️ 找不到該商品，可能已被其他裝置刪除，請重新整理後再試。");
+            document.getElementById('verifyScanModal').classList.add('hidden');
+            window.isVerifying = false; return;
+        }
+
+        const expectedQty = parseFloat(item.initialQty) || 0;
+        document.getElementById('verifyScanModal').classList.add('hidden');
+
+        if (actualQty === expectedQty) {
+            if (currentCountMode === 'recount') item.recountDone = true;
+            if (currentCountMode === 'random') item.randomDone = true;
+            syncToFirebase(); window.renderZoneItems();
+            window.isVerifying = false; 
+        } else {
+            alert("❌ 數量不符！請簽名核准更正。");
+            window.pendingCorrectionQty = actualQty; 
+            window.openSignaturePad(item.id, 'item'); 
+        }
+    }
+
+    window.cancelVerifyScan = function() {
+        document.getElementById('verifyScanModal').classList.add('hidden'); 
+        window.isVerifying = false; 
+    }
+
+    window.handleEnter = function(e, currentId) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const inputs = Array.from(document.querySelectorAll('.initial-section input'));
+            const currentIndex = inputs.findIndex(input => input.id === `qty-${currentId}`);
+            if (currentIndex > -1) {
+                for (let i = currentIndex + 1; i < inputs.length; i++) {
+                    if (inputs[i].value === '') {
+                        inputs[i].focus();
+                        inputs[i].scrollIntoView({behavior: 'smooth', block: 'center'});
+                        return;
+                    }
+                }
+            }
+            document.activeElement.blur();
+        }
+    }
+
+    window.openZoneDetail = function(zoneName) {
+        currentActiveZone = zoneName; document.getElementById('currentZoneTitle').innerText = zoneName;
+        document.getElementById('view-zone-list').classList.add('hidden'); document.getElementById('view-zone-detail').classList.remove('hidden');
+        window.setCountMode('initial'); window.renderZoneSignatures(); 
+
+        setTimeout(() => {
+            if (currentCountMode === 'initial') {
+                const firstEmpty = document.querySelector('.initial-section input:not([value]), .initial-section input[value=""]');
+                if(firstEmpty) {
+                    firstEmpty.focus();
+                    firstEmpty.scrollIntoView({behavior: 'smooth', block: 'center'});
+                }
+            }
+        }, 150);
+    }
+
+    window.renderZoneSignatures = function() {
+        const status = zoneStatus[currentActiveZone] || {};
+        ['zoneInitial', 'zoneRecount', 'zoneRandom'].forEach(type => {
+            const imgEl = document.getElementById(`sigZone-${type}`);
+            if (status[`sign_${type}`]) { imgEl.src = status[`sign_${type}`]; imgEl.classList.remove('hidden'); } else { imgEl.classList.add('hidden'); }
+        });
+    }
+
+    window.confirmItemCorrect = function(itemId) {
+        const item = scannedItems.find(i => i.id === itemId);
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+        if (item) {
+            if (isUncounted(item.initialQty)) { alert("⚠️ 請先完成初盤數量輸入！"); return; }
+            if (currentCountMode === 'recount') item.recountDone = true; if (currentCountMode === 'random') item.randomDone = true;
+            syncToFirebase(); window.renderZoneItems();
+        }
+    }
+
+    window.updateModeUI = function() {
+        if (!currentActiveZone) return;
+        const zoneItems = scannedItems.filter(i => i.zone === currentActiveZone);
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+        const unCounted = zoneItems.filter(i => isUncounted(i.initialQty)).length;
+        const unRecounted = zoneItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
+        
+        const btnRandom = document.getElementById('btnModeRandom');
+        const hintEl = document.getElementById('modeStatusHint');
+        let hintTexts = [];
+        
+        if (unCounted > 0 || unRecounted > 0) {
+            btnRandom.disabled = true;
+            if (unCounted > 0) hintTexts.push(`缺 ${unCounted} 項初盤`);
+            if (unRecounted > 0) hintTexts.push(`缺 ${unRecounted} 項覆核`);
+        } else {
+            btnRandom.disabled = false;
+        }
+        
+        if (currentCountMode === 'recount' && unCounted > 0) {
+            hintEl.innerHTML = `⚠️ 尚有 ${unCounted} 項未初盤，已暫時隱藏`;
+            hintEl.style.color = '#ff9800';
+        } else if (currentCountMode === 'random' && hintTexts.length > 0) {
+            hintEl.innerHTML = `⚠️ 無法抽盤：${hintTexts.join('、')}`;
+            hintEl.style.color = '#f44336';
+        } else if (hintTexts.length > 0) {
+            hintEl.innerHTML = `📌 抽盤鎖定中：${hintTexts.join('、')}`;
+            hintEl.style.color = '#888';
+        } else {
+            hintEl.innerHTML = `✅ 全區覆核完成，可進行抽盤。`;
+            hintEl.style.color = '#4CAF50';
+        }
+    }
+
+    window.renderZoneItems = function() {
+        const container = document.getElementById('inventoryListContainer'); container.innerHTML = ""; let renderedCount = 0;
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+
+        scannedItems.filter(item => item.zone === currentActiveZone).forEach(item => {
+            if ((currentCountMode === 'recount' || currentCountMode === 'random') && isUncounted(item.initialQty)) return;
+            if (currentCountMode === 'random' && !item.isRandomChecked) return;
+            if (currentCountMode === 'recount' && item.recountDone) return;
+            if (currentCountMode === 'random' && item.randomDone) return;
+            renderedCount++;
+
+            const val = !isUncounted(item.initialQty) ? item.initialQty : ""; 
+            const showInitial = currentCountMode === 'initial' ? '' : 'hidden'; 
+            const showRecount = currentCountMode !== 'initial' ? '' : 'hidden';
+            const rBadge = currentCountMode === 'random' ? `<span style="background: #fbd914; font-size: 12px; padding: 3px 6px; border-radius: 4px; margin-left: 8px;">🎯 抽盤</span>` : '';
+            
+            let sigHTML = '';
+            if (item.correctionHistory && item.correctionHistory.length > 0) {
+                const lastCorrection = item.correctionHistory[item.correctionHistory.length - 1];
+                sigHTML = `
+                    <div style="margin-top:10px; font-size:12px; color:#c62828; font-weight:bold;">⚠️ 已更正 ${item.correctionHistory.length} 次，最後簽名：</div>
+                    <img id="sigImage-${item.id}" class="sig-preview" src="${lastCorrection.sign}">
+                `;
+            } else {
+                sigHTML = `<img id="sigImage-${item.id}" class="sig-preview hidden">`;
+            }
+
+            container.insertAdjacentHTML('beforeend', `
+            <div class="card ${val !== "" ? 'done' : ''}" id="card-${item.id}">
+                <div class="item-title">${item.name} <span style="color:#0058a3">(${item.unit})</span> ${rBadge}</div>
+                <div class="item-code">貨號：${item.code}</div>
+                <div class="initial-section ${showInitial}">
+                    <input type="number" inputmode="decimal" pattern="[0-9]*" min="0" step="any" id="qty-${item.id}" value="${val}" placeholder="直接點選輸入數量" onchange="window.updateQty('${item.id}')" onkeydown="window.handleEnter(event, '${item.id}')">
+                </div>
+                <div class="recount-section ${showRecount}">
+                    <p>初盤數量：<strong style="font-size:20px; color:#0058a3;">${val === "" ? "未盤" : val}</strong></p>
+                    ${val === "" ? `
+                        <div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 6px; border-left: 4px solid #ffc107;">
+                            ⚠️ 請先完成初盤數量輸入，才可進行覆核。
+                        </div>
+                    ` : `
+                        <div id="recountActions-${item.id}">
+                            <button class="btn btn-success" onclick="window.confirmItemCorrect('${item.id}')">✅ 無誤</button>
+                            <button class="btn btn-danger" onclick="document.getElementById('errorSection-${item.id}').classList.remove('hidden'); this.parentElement.classList.add('hidden')">❌ 有誤</button>
+                        </div>
+                        <div id="errorSection-${item.id}" class="hidden" style="margin-top:10px; border-top:1px dashed #ccc; padding-top:10px;">
+                            <input type="number" inputmode="decimal" min="0" step="any" id="manualVerifyInput-${item.id}" placeholder="正確數量">
+                            <button class="btn btn-primary" style="margin-top:10px;" onclick="window.triggerManualCorrection('${item.id}')">✍️ 錯誤更正簽名</button>
+                            ${sigHTML}
+                        </div>
+                    `}
+                </div>
+            </div>`);
+        });
+
+        if (renderedCount === 0) {
+            const zoneItemsAll = scannedItems.filter(i => i.zone === currentActiveZone);
+            const anyCounted = zoneItemsAll.some(i => !isUncounted(i.initialQty));
+            
+            if (currentCountMode === 'random') {
+                if (zoneItemsAll.some(i => i.isRandomChecked)) {
+                    container.innerHTML = "<div style='text-align:center; background:#d4edda; color:#155724; padding:20px; border-radius:8px; margin-bottom:15px; border:1px solid #c3e6cb;'><h3 style='margin:0;'>🎉 太棒了！</h3><p style='margin:10px 0 0 0;'>本區抽盤項目已全數確認完畢。</p></div>";
+                } else {
+                    container.innerHTML = "<p style='text-align:center; color:#666;'>本區尚無商品可抽盤。</p>";
+                }
+            } else if (currentCountMode === 'recount') {
+                if (!anyCounted) {
+                    container.innerHTML = "<div style='text-align:center; color:#856404; background:#fff3cd; padding:20px; border-radius:8px; border:1px solid #ffeeba;'><h3 style='margin:0;'>⏳ 尚未初盤</h3><p style='margin:10px 0 0 0;'>本區尚無商品完成初盤，暫無項目可覆盤。</p></div>";
+                } else {
+                    container.innerHTML = "<div style='text-align:center; background:#d4edda; color:#155724; padding:20px; border-radius:8px; margin-bottom:15px; border:1px solid #c3e6cb;'><h3 style='margin:0;'>🎉 太棒了！</h3><p style='margin:10px 0 0 0;'>目前已初盤的項目都覆盤完畢了，其餘商品初盤後會自動出現。</p></div>";
+                }
+            } else if (currentCountMode === 'initial') {
+                container.innerHTML = "<p style='text-align:center; color:#666;'>本區尚無商品。</p>";
+            }
+        }
+        
+        window.updateModeUI(); 
+    }
+
+    window.triggerManualCorrection = function(itemId) {
+        const inputVal = document.getElementById(`manualVerifyInput-${itemId}`).value;
+        const actualQty = parseFloat(inputVal);
+        if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的正確數量！"); return; }
+        window.pendingCorrectionQty = actualQty;
+        window.isVerifying = true; 
+        window.openSignaturePad(itemId, 'item');
+    }
+
+    window.updateQty = function(itemId, overrideVal = null) {
+        const inputVal = overrideVal !== null ? overrideVal : document.getElementById(`qty-${itemId}`).value;
+        const itemIndex = scannedItems.findIndex(i => i.id === itemId);
+        if(itemIndex > -1) { 
+            scannedItems[itemIndex].initialQty = parseFloat(inputVal) < 0 ? 0 : inputVal; 
+            if (!systemStartTime && inputVal !== "") systemStartTime = Date.now(); 
+            syncToFirebase(); 
+            const card = document.getElementById(`card-${itemId}`); if(card) { if(inputVal !== "") card.classList.add('done'); else card.classList.remove('done'); } 
+            window.updateModeUI(); 
+        }
+    }
+
+    window.setCountMode = function(mode) {
+        if (mode === 'random' && currentActiveZone) {
+            const zoneItems = scannedItems.filter(i => i.zone === currentActiveZone);
+            if (!zoneItems.some(i => i.isRandomChecked) && zoneItems.length > 0) {
+                const pickCount = Math.ceil(zoneItems.length / 3);
+                let selected = [];
+
+                let correctedItems = zoneItems.filter(i => i.correctionHistory && i.correctionHistory.length > 0);
+                selected.push(...correctedItems);
+
+                let remainingItems = zoneItems.filter(i => !selected.includes(i));
+                remainingItems.sort((a, b) => (parseFloat(b.initialQty) || 0) - (parseFloat(a.initialQty) || 0));
+                let highQtyCount = Math.ceil(remainingItems.length * 0.2);
+                selected.push(...remainingItems.splice(0, highQtyCount));
+
+                if (selected.length < pickCount) {
+                    remainingItems.sort(() => 0.5 - Math.random());
+                    selected.push(...remainingItems.slice(0, pickCount - selected.length));
+                } else if (selected.length > pickCount) {
+                    selected = selected.slice(0, pickCount);
+                }
+
+                selected.forEach(target => { const found = scannedItems.find(item => item.id === target.id); if(found) found.isRandomChecked = true; });
+                syncToFirebase(); alert(`🎲 智慧抽盤完成！已優先抽出「曾更正」與「數量大」之品項，共抽出 ${selected.length} 項！`);
+            }
+        }
+        
+        currentCountMode = mode;
+        if(currentActiveZone) window.renderZoneItems();
+        
+        ['Initial', 'Recount', 'Random'].forEach(m => {
+            const btn = document.getElementById(`btnMode${m}`);
+            if(mode.toLowerCase() === m.toLowerCase()) { btn.style.backgroundColor = '#0058a3'; btn.style.color = 'white'; } else { btn.style.backgroundColor = '#e0e0e0'; btn.style.color = '#333'; }
+        });
+        window.updateModeUI();
+    }
+
+    window.openOnTheFlyModal = function() {
+        document.getElementById('flyCode').value = ''; document.getElementById('flyName').value = ''; document.getElementById('flyUnit').value = 'PC'; document.getElementById('flyQty').value = ''; document.getElementById('onTheFlyModal').classList.remove('hidden');
+    }
+    window.closeOnTheFlyModal = function() { document.getElementById('onTheFlyModal').classList.add('hidden'); }
+    document.getElementById('flyCode').addEventListener('change', function() {
+        const code = this.value.trim(); if(productDatabase[code]) { document.getElementById('flyName').value = productDatabase[code].name; document.getElementById('flyUnit').value = productDatabase[code].unit; }
+    });
+    window.saveOnTheFlyItem = function() {
+        const code = document.getElementById('flyCode').value.trim(); const name = document.getElementById('flyName').value.trim(); const unit = document.getElementById('flyUnit').value.trim(); const qty = document.getElementById('flyQty').value;
+        if(!code || !name || !unit || qty === "") { alert("請完整輸入商品資訊與初盤數量！"); return; }
+        productDatabase[code] = { name: name, unit: unit }; window.addToInventoryList(code, name, unit, currentActiveZone, qty);
+        if (!systemStartTime) systemStartTime = Date.now();
+        window.closeOnTheFlyModal(); window.renderZoneItems(); alert("✅ 臨時商品已成功加入本盤區！");
+    }
+
+    const canvas = document.getElementById('sigCanvas'); const ctx = canvas.getContext('2d'); let isDrawing = false;
+    window.resizeCanvas = function() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; }; window.addEventListener('resize', window.resizeCanvas); window.resizeCanvas();
+    const handleStart = (e) => { isDrawing=true; ctx.beginPath(); const rect = canvas.getBoundingClientRect(); const cx = e.touches ? e.touches[0].clientX : e.clientX; const cy = e.touches ? e.touches[0].clientY : e.clientY; ctx.moveTo(cx - rect.left, cy - rect.top); };
+    const handleMove = (e) => { if(!isDrawing)return; e.preventDefault(); ctx.lineWidth=3; ctx.lineCap='round'; ctx.strokeStyle='#000'; const rect = canvas.getBoundingClientRect(); const cx = e.touches ? e.touches[0].clientX : e.clientX; const cy = e.touches ? e.touches[0].clientY : e.clientY; ctx.lineTo(cx - rect.left, cy - rect.top); ctx.stroke(); };
+    const handleEnd = () => { isDrawing=false; };
+    canvas.addEventListener('mousedown', handleStart); canvas.addEventListener('mousemove', handleMove); canvas.addEventListener('mouseup', handleEnd); canvas.addEventListener('mouseout', handleEnd);
+    canvas.addEventListener('touchstart', handleStart, {passive:false}); canvas.addEventListener('touchmove', handleMove, {passive:false}); canvas.addEventListener('touchend', handleEnd);
+    window.clearCanvas = function() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    
+    window.openSignaturePad = function(targetId, contextType = 'item') { 
+        currentSignContext = { type: contextType, targetId: targetId }; document.getElementById('signatureModal').classList.remove('hidden'); window.resizeCanvas(); window.clearCanvas(); 
+        
+        // 檢查是否有預設簽名
+        const savedSig = localStorage.getItem('ikea_default_signature');
+        if (savedSig) {
+            document.getElementById('defaultSignatureSection').classList.remove('hidden');
+        } else {
+            document.getElementById('defaultSignatureSection').classList.add('hidden');
+        }
+    }
+
+    // 核心新增：一鍵套用預設簽名
+    window.useDefaultSignature = function() {
+        const savedSig = localStorage.getItem('ikea_default_signature');
+        if (savedSig) {
+            window.applySignature(savedSig);
+            window.closeSignaturePad();
+        } else {
+            alert("找不到預設簽名，請先手動簽名並儲存！");
+        }
+    }
+    
+    window.closeSignaturePad = function() { 
+        document.getElementById('signatureModal').classList.add('hidden'); 
+        window.isVerifying = false; 
+        window.pendingCorrectionQty = null; 
+    }
+    
+    window.saveSignature = function() { window.applySignature(canvas.toDataURL()); window.closeSignaturePad(); }
+    
+    window.saveAsDefaultSignature = function() { 
+        const dataUrl = canvas.toDataURL(); 
+        localStorage.setItem('ikea_default_signature', dataUrl); 
+        alert("已存為個人預設簽名！(此設定只保留於本裝置)"); 
+        window.applySignature(dataUrl); 
+        window.closeSignaturePad(); 
+    }
+    
+    window.applySignature = function(imgData) { 
+        if (currentSignContext.type === 'item') {
+            const item = scannedItems.find(i => i.id === currentSignContext.targetId);
+            if (item) {
+                if (window.pendingCorrectionQty !== null && window.pendingCorrectionQty !== undefined) {
+                    if (!item.correctionHistory) item.correctionHistory = [];
+                    item.correctionHistory.push({
+                        timestamp: new Date().toLocaleString('zh-TW'),
+                        oldQty: item.initialQty,
+                        newQty: window.pendingCorrectionQty,
+                        mode: currentCountMode,
+                        sign: imgData
+                    });
+                    item.initialQty = window.pendingCorrectionQty;
+                    window.pendingCorrectionQty = null; 
+                }
+                
+                if (currentCountMode === 'recount') item.recountDone = true; 
+                if (currentCountMode === 'random') item.randomDone = true; 
+            }
+            syncToFirebase(); setTimeout(() => { window.renderZoneItems(); }, 500);
+        } else if (currentSignContext.type === 'zone') {
+            const signKey = `sign_${currentSignContext.targetId}`; 
+            if (!zoneStatus[currentActiveZone]) zoneStatus[currentActiveZone] = {};
+            zoneStatus[currentActiveZone][signKey] = imgData; syncToFirebase(); window.renderZoneSignatures(); 
+        }
+    }
+</script>
+</body>
+</html>
