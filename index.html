@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 動態快捷與重置版</title>
+    <title>SFM 完整盤點系統 - 智慧乾淨快捷鍵版</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -134,7 +134,7 @@
                 </button>
             </div>
 
-            <!-- 新增：清空資料按鈕 -->
+            <!-- 清空資料按鈕 -->
             <button class="home-menu-btn" style="border-color: #f44336;" onclick="clearAllCurrentData()">
                 <h3 style="color: #f44336;">🗑️ 重新開始 (清空目前盤單)</h3>
                 <p>一鍵清空測試資料與所有進度 (不影響歷史紀錄)</p>
@@ -546,7 +546,6 @@
         window.updateHeaderMonth();
     }
 
-    // === 實作安全清空功能 ===
     window.clearAllCurrentData = function() {
         const check1 = confirm("⚠️ 警告：您即將清空「目前所有」的盤單資料與進度！\n(已封存的歷史紀錄不會受影響)\n\n請問確定要繼續嗎？");
         if (!check1) return;
@@ -765,25 +764,25 @@
         }
     }
 
-    // === 動態產生盤區快捷鍵 ===
+    // === 🧹 核心優化：智慧產生乾淨的盤區快捷鍵 ===
     window.renderQuickZoneButtons = function() {
         const container = document.getElementById('quickZoneCategories');
         if (!container) return;
         
         let prefixes = new Set();
-        // 抓取所有已知盤區的字首 (過濾掉尾部的數字)
+        // 嚴格抓取：只抓前面的純英文、純中文、或「數字+樓」
         knownZones.forEach(zone => {
-            const match = zone.match(/^(.*?)(\d*)$/);
+            const match = zone.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)/);
             if (match && match[1]) {
-                prefixes.add(match[1].trim());
+                prefixes.add(match[1].toUpperCase());
             } else {
-                prefixes.add(zone); // 如果沒有數字，整串當字首
+                prefixes.add(zone); // 如果都不符合，保留整串
             }
         });
         
         let html = '';
         [...prefixes].sort().forEach(prefix => {
-            if(prefix !== "自訂") {
+            if(prefix !== "自訂" && prefix !== "SETTING") { 
                 html += `<button class="cat-tab" onclick="selectQuickZonePrefix('${prefix}')">${prefix}</button>`;
             }
         });
@@ -816,16 +815,15 @@
     window.jumpToZone = function(zoneName) {
         document.getElementById('zoneInput').value = zoneName; let prefix = '自訂'; let suffix = '';
         
-        // 解析動態盤區字首與尾數
-        const match = zoneName.match(/^(.*?)(\d*)$/);
+        // 🔄 配合乾淨按鈕：反向拆解完整盤區名稱
+        const match = zoneName.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)(\d*)(.*)$/);
         if (match && match[1]) {
-            prefix = match[1].trim();
-            suffix = match[2];
+            prefix = match[1].toUpperCase();
+            suffix = match[2]; // 只把數字丟進號碼框
         } else {
             prefix = zoneName;
         }
 
-        // 切換上方對應的按鈕狀態
         document.querySelectorAll('#quickZoneCategories .cat-tab').forEach(btn => { 
             btn.classList.toggle('active', btn.innerText === prefix); 
         });
@@ -845,7 +843,6 @@
         document.getElementById('zoneSpecificTableContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    // 選擇動態捷徑按鈕
     window.selectQuickZonePrefix = function(prefix) {
         document.querySelectorAll('#quickZoneCategories .cat-tab').forEach(btn => { 
             btn.classList.toggle('active', btn.innerText === prefix); 
@@ -862,23 +859,40 @@
         window.renderCreateListTable(); 
     }
 
-    // 智慧型補零機制
+    // === 🧠 核心優化：模糊比對自動補齊 (Fuzzy Smart Match) ===
     window.updateFinalZone = function() {
         const prefix = document.getElementById('quickZonePrefix').value; 
         let suffix = document.getElementById('quickZoneSuffix').value;
         
-        if(suffix && !isNaN(suffix)) {
-            if (knownZones.has(prefix + suffix)) {
-                // 完全符合，不須補零
-            } else if (knownZones.has(prefix + suffix.padStart(3, '0'))) {
-                suffix = suffix.padStart(3, '0'); // 需要補成 3 碼
-            } else if (knownZones.has(prefix + suffix.padStart(2, '0'))) {
-                suffix = suffix.padStart(2, '0'); // 需要補成 2 碼
+        let finalZoneName = prefix;
+
+        if(suffix) {
+            let padded3 = suffix.padStart(3, '0');
+            let padded2 = suffix.padStart(2, '0');
+            
+            // 建立可能的字首組合 (例如：BIS013, BIS13)
+            let possiblePrefixes = [
+                prefix + padded3, 
+                prefix + padded2, 
+                prefix + suffix   
+            ];
+
+            // 去資料庫裡尋找「以這些字首開頭」的完整盤區名
+            let matchedZone = [...knownZones].find(z => possiblePrefixes.some(p => z.startsWith(p)));
+
+            if (matchedZone) {
+                finalZoneName = matchedZone; // 找到就直接套用完整名稱 (包含括號備註)
             } else {
-                suffix = suffix.padStart(3, '0'); // 預設補成 3 碼
+                // 找不到的話，預設幫他補 3 碼
+                if (!isNaN(suffix) && !['收貨區', '4樓'].includes(prefix)) {
+                    finalZoneName = prefix + padded3;
+                } else {
+                    finalZoneName = prefix + suffix;
+                }
             }
         }
-        document.getElementById('zoneInput').value = prefix + (suffix || ''); 
+        
+        document.getElementById('zoneInput').value = finalZoneName; 
         window.renderCreateListTable(); 
     }
 
@@ -1067,10 +1081,8 @@
                 scannedItems = []; systemStartTime = null;
                 for(let z in zoneStatus) { zoneStatus[z] = { isSkipped: false, sign_zoneInitial: null, sign_zoneRecount: null, sign_zoneRandom: null }; }
                 
-                syncToFirebase().then(()=>{
-                    set(ref(db, 'sfm_inventory_history'), inventoryHistory).then(()=>{
-                        window.renderCreateListTable(); alert("✅ 封存成功！系統已重置。");
-                    });
+                set(ref(db, 'sfm_inventory_history'), inventoryHistory).then(()=>{
+                    syncToFirebase(); window.renderCreateListTable(); alert("✅ 封存成功！系統已重置。");
                 }).catch((err)=>{ alert("⚠️ 封存失敗，已暫存於本機，請檢查網路連線。"); console.error(err); });
             }
         }, 1000);
@@ -1188,7 +1200,7 @@
                     }
                 }
             });
-            window.renderQuickZoneButtons(); // 更新快捷鍵
+            window.renderQuickZoneButtons(); 
             syncToFirebase(); 
             let msg = `✅ Excel 匯入成功！\n- 盤區已加入【${currentDepartment === 'REST' ? 'IKEA 餐廳' : '超市與美食小站'}】。`;
             if (shouldImportItems) msg += `\n- 載入了 ${importedItemsCount} 項預設商品。`; alert(msg);
@@ -1256,7 +1268,7 @@
             { facingMode: "environment" }, 
             { fps: 15, qrbox: { width: 250, height: 150 }, formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A ] }, 
             (txt) => { 
-                if (window.isVerifying) return; // 相機鎖定防呆
+                if (window.isVerifying) return; 
                 if (txt === lastScanCode && (Date.now() - lastScanTime) < 1500) return;
                 lastScanCode = txt; lastScanTime = Date.now(); window.playBeep();
                 if (scanMode === 'create') { document.getElementById('itemCodeInput').value = txt; window.processScan(); } 
@@ -1664,7 +1676,6 @@
         }
     }
     
-    // 初始化時，如果已知有區域，生成快捷按鈕
     window.addEventListener('load', function() {
         if (knownZones.size > 0) window.renderQuickZoneButtons();
     });
