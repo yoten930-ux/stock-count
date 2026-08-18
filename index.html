@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 嚴格盲盤與快取優化版 (修復總覽)</title>
+    <title>SFM 完整盤點系統 - 效能淨化修復版</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -105,7 +105,6 @@
                 📦 <span class="display-month" onclick="window.changeMonth()" style="cursor:pointer; text-decoration:underline; color:#ff9800;" title="點擊修改盤點月份"></span> 盤點系統
             </div>
 
-            <!-- 系統進階設定 (實名制與盲盤) -->
             <div class="input-group" style="background-color: #f9f9f9; border: 2px dashed #ccc;">
                 <label style="color:#0058a3;">⚙️ 系統進階設定</label>
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px;">
@@ -195,7 +194,7 @@
             </div>
 
             <div class="input-group">
-                <label>第三步：手動輸入或掃描貨號加入盤單</label>
+                <label>第三步：手 পণ্ডিত輸入或掃描貨號加入盤單</label>
                 <div style="display:flex; gap:10px; margin-bottom: 15px;">
                     <input type="text" id="itemCodeInput" placeholder="輸入條碼...">
                     <button class="btn btn-outline" style="width:auto; margin-bottom:0; padding: 0 15px; font-size: 20px;" onclick="startCameraScanner('create')" title="相機掃描">📷</button>
@@ -255,7 +254,6 @@
                     <button class="btn" id="btnModeRecount" onclick="setCountMode('recount')" style="background-color: #e0e0e0; color: #333; margin-bottom:0;">覆盤</button>
                     <button class="btn" id="btnModeRandom" onclick="setCountMode('random')" style="background-color: #e0e0e0; color: #333; margin-bottom:0;">抽盤</button>
                 </div>
-                <!-- 動態狀態提示區 -->
                 <div id="modeStatusHint" style="font-size: 13px; color: #f44336; margin-bottom: 15px; font-weight: bold; min-height: 18px;"></div>
 
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
@@ -427,7 +425,6 @@
         </div>
     </div>
 
-<!-- ================= 加入 Firebase ES 模組 ================= -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
@@ -476,7 +473,6 @@
     let currentUser = localStorage.getItem('ikea_operator_id') || '';
     let isBlindCountMode = localStorage.getItem('ikea_blind_count') === 'true';
 
-    // === ⚡ 效能升級：O(1) 分類快取引擎 ===
     window.zoneCategoryCache = {};
     window.buildZoneCategoryCache = function() {
         window.zoneCategoryCache = {};
@@ -518,7 +514,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
         loadPersistedDataLocalOnly();
-        window.buildZoneCategoryCache(); // 載入後建立快取
+        window.buildZoneCategoryCache(); 
         updateUI();
         document.getElementById('blindCountToggle').checked = isBlindCountMode;
         if (currentUser) {
@@ -568,7 +564,7 @@
             zoneStatus = data.zoneStatus || {};
             systemStartTime = data.systemStartTime || null;
             savePersistedDataLocalOnly();
-            window.buildZoneCategoryCache(); // 雲端資料回來時重建快取
+            window.buildZoneCategoryCache(); 
             updateUI();
         } else {
             if (scannedItems.length > 0 || knownZones.size > 0) syncToFirebase(); 
@@ -698,7 +694,7 @@
     window.setDepartment = function(dept) {
         currentDepartment = dept;
         document.querySelectorAll('.dept-btn').forEach(btn => { btn.classList.toggle('active', btn.dataset.dept === dept); });
-        window.buildZoneCategoryCache(); // 換部門重建快取
+        window.buildZoneCategoryCache(); 
         window.renderQuickZoneButtons(); 
         window.renderZoneChecklist(); 
         window.renderCreateListTable(); 
@@ -1113,7 +1109,7 @@
         }
     }
 
-    // === 📊 匯出資料獨立的實名制紀錄欄位 ===
+    // === 📊 匯出資料新增實名制紀錄 ===
     window.exportToExcel = function() {
         if (scannedItems.length === 0) { alert("目前沒有盤點資料可供匯出！"); return; }
         
@@ -1310,17 +1306,16 @@
         reader.readAsArrayBuffer(file);
     }
 
-    // 🐛 修復：確保先指派部門再重建快取，避免新盤區分類誤判
     window.processScan = function() {
         const codeInput = document.getElementById('itemCodeInput'); const code = codeInput.value.trim(); const zone = document.getElementById('zoneInput').value.trim();
         if (!zone) { alert("請先在第二步建立或確認『盤點區域』！"); return; }
         if (!code) return;
         
         knownZones.add(zone); 
-        if(!zoneDepartments[zone]) zoneDepartments[zone] = currentDepartment; // 先給定部門
+        if(!zoneDepartments[zone]) zoneDepartments[zone] = currentDepartment; 
         
-        window.buildZoneCategoryCache(); // 再更新快取
-        window.renderQuickZoneButtons(); // 再重繪按鈕
+        window.buildZoneCategoryCache(); 
+        window.renderQuickZoneButtons(); 
         
         if (productDatabase[code]) { window.addToInventoryList(code, productDatabase[code].name, productDatabase[code].unit, zone); codeInput.value = ""; } 
         else { document.getElementById('manualAddSection').classList.remove('hidden'); document.getElementById('manualCode').value = code; }
@@ -1485,7 +1480,6 @@
         }
     }
 
-    // === 👤 核心升級一：分離職責綁定獨立的 Operator 欄位 ===
     window.submitVerifyScan = function() {
         const actualQty = parseFloat(document.getElementById('verifyScanActual').value);
         if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的數量！"); return; }
@@ -1516,7 +1510,6 @@
         }
     }
 
-    // === 🛡️ 核心修復二：加入 submitBlindListVerify 防呆機制 ===
     window.submitBlindListVerify = function(itemId) {
         const actualInput = document.getElementById(`blindVerifyInputList-${itemId}`).value;
         const actualQty = parseFloat(actualInput);
