@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 效能淨化修復版</title>
+    <title>SFM 完整盤點系統 - 嚴格盲盤與快取優化版</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -105,6 +105,7 @@
                 📦 <span class="display-month" onclick="window.changeMonth()" style="cursor:pointer; text-decoration:underline; color:#ff9800;" title="點擊修改盤點月份"></span> 盤點系統
             </div>
 
+            <!-- 系統進階設定 (實名制與盲盤) -->
             <div class="input-group" style="background-color: #f9f9f9; border: 2px dashed #ccc;">
                 <label style="color:#0058a3;">⚙️ 系統進階設定</label>
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px;">
@@ -194,7 +195,8 @@
             </div>
 
             <div class="input-group">
-                <label>第三步：手 পণ্ডিত輸入或掃描貨號加入盤單</label>
+                <!-- 修正標籤裡的亂碼文字 -->
+                <label>第三步：手動輸入或掃描貨號加入盤單</label>
                 <div style="display:flex; gap:10px; margin-bottom: 15px;">
                     <input type="text" id="itemCodeInput" placeholder="輸入條碼...">
                     <button class="btn btn-outline" style="width:auto; margin-bottom:0; padding: 0 15px; font-size: 20px;" onclick="startCameraScanner('create')" title="相機掃描">📷</button>
@@ -254,6 +256,7 @@
                     <button class="btn" id="btnModeRecount" onclick="setCountMode('recount')" style="background-color: #e0e0e0; color: #333; margin-bottom:0;">覆盤</button>
                     <button class="btn" id="btnModeRandom" onclick="setCountMode('random')" style="background-color: #e0e0e0; color: #333; margin-bottom:0;">抽盤</button>
                 </div>
+                <!-- 動態狀態提示區 -->
                 <div id="modeStatusHint" style="font-size: 13px; color: #f44336; margin-bottom: 15px; font-weight: bold; min-height: 18px;"></div>
 
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
@@ -1109,7 +1112,7 @@
         }
     }
 
-    // === 📊 匯出資料新增實名制紀錄 ===
+    // === 📊 匯出資料獨立的實名制紀錄欄位 ===
     window.exportToExcel = function() {
         if (scannedItems.length === 0) { alert("目前沒有盤點資料可供匯出！"); return; }
         
@@ -1306,6 +1309,7 @@
         reader.readAsArrayBuffer(file);
     }
 
+    // 🐛 修復：確保先指派部門再重建快取，避免新盤區分類誤判
     window.processScan = function() {
         const codeInput = document.getElementById('itemCodeInput'); const code = codeInput.value.trim(); const zone = document.getElementById('zoneInput').value.trim();
         if (!zone) { alert("請先在第二步建立或確認『盤點區域』！"); return; }
@@ -1408,6 +1412,7 @@
         }
     }
 
+    // === 🙈 核心升級：盲盤模式隱藏即時差異計算 ===
     window.calculateVerifyDiff = function() {
         const diffEl = document.getElementById('verifyScanDiff');
         
@@ -1480,6 +1485,7 @@
         }
     }
 
+    // === 👤 核心升級一：分離職責綁定獨立的 Operator 欄位 ===
     window.submitVerifyScan = function() {
         const actualQty = parseFloat(document.getElementById('verifyScanActual').value);
         if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的數量！"); return; }
@@ -1510,6 +1516,7 @@
         }
     }
 
+    // === 🛡️ 核心修復二：加入 submitBlindListVerify 防呆機制 ===
     window.submitBlindListVerify = function(itemId) {
         const actualInput = document.getElementById(`blindVerifyInputList-${itemId}`).value;
         const actualQty = parseFloat(actualInput);
@@ -1659,6 +1666,7 @@
                 sigHTML = `<img id="sigImage-${item.id}" class="sig-preview hidden">`;
             }
 
+            // === 🔒 核心升級二：盲盤模式列表 UI 動態切換 ===
             let actionHTML = '';
             if (isBlindCountMode && currentCountMode !== 'initial') {
                 actionHTML = `
@@ -1842,6 +1850,7 @@
     window.saveSignature = function() { window.applySignature(canvas.toDataURL()); window.closeSignaturePad(); }
     window.saveAsDefaultSignature = function() { const dataUrl = canvas.toDataURL(); localStorage.setItem('ikea_default_signature', dataUrl); alert("已存為個人預設簽名！(此設定只保留於本裝置)"); window.applySignature(dataUrl); window.closeSignaturePad(); }
     
+    // === 👤 核心升級一：職責分離同步更新至此 ===
     window.applySignature = function(imgData) { 
         if (currentSignContext.type === 'item') {
             const item = scannedItems.find(i => i.id === currentSignContext.targetId);
