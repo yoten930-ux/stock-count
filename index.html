@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 嚴格盲盤與快取優化版</title>
+    <title>SFM 完整盤點系統 - 嚴格盲盤與快取優化版 (修復總覽)</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -1026,6 +1026,93 @@
         });
     }
 
+    // === 👨‍💻 核心修復一：還原總覽儀表板的全館進度統計 ===
+    window.renderDashboard = function() {
+        const container = document.getElementById('dashIssuesContainer');
+        const activeZonesArray = window.sortZones([...knownZones].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
+        
+        let totalItems = scannedItems.length;
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+        let countedItems = scannedItems.filter(i => !isUncounted(i.initialQty)).length;
+        
+        let finishedZonesCount = 0;
+        let issuesHtml = "";
+
+        let multipleCorrections = scannedItems.filter(i => i.correctionHistory && i.correctionHistory.length > 1);
+        if (multipleCorrections.length > 0) {
+            issuesHtml += `<h4 style="color:#c62828; margin-top:5px; border-bottom:2px solid #ffcdd2; padding-bottom:5px;">🚨 需特別注意：多次更正商品</h4>`;
+            multipleCorrections.forEach(i => {
+                const deptName = (zoneDepartments[i.zone] || 'SFM') === 'REST' ? '🍽️' : '🛒';
+                issuesHtml += `<div class="issue-card" style="background:#ffebee; border-left-color:#f44336; color:#c62828;">
+                    <strong>${deptName} [${i.zone}] - ${i.name}</strong><br>
+                    <span style="font-size:14px;">已被更正 ${i.correctionHistory.length} 次，請店長優先查核！</span>
+                </div>`;
+            });
+            issuesHtml += `<h4 style="color:#0058a3; margin-top:20px; border-bottom:2px solid #ccc; padding-bottom:5px;">⚠️ 待處理盤區清單</h4>`;
+        }
+
+        activeZonesArray.forEach(z => {
+            const isZoneDone = window.checkZoneDone(z);
+            if (isZoneDone) {
+                finishedZonesCount++;
+            } else {
+                const zItems = scannedItems.filter(i => i.zone === z);
+                let reason = [];
+                
+                if (zItems.length === 0) {
+                    reason = ["尚無商品加入清單"];
+                } else {
+                    const uncounted = zItems.filter(i => isUncounted(i.initialQty)).length;
+                    if (uncounted > 0) reason.push(`缺 ${uncounted} 項初盤`);
+                    
+                    const zStat = zoneStatus[z] || {};
+                    if (!zStat.sign_zoneInitial) reason.push("缺初盤簽名");
+                    if (!zStat.sign_zoneRecount) reason.push("缺覆盤簽名");
+                    if (!zStat.sign_zoneRandom) reason.push("缺抽盤簽名");
+                    
+                    const unRecounted = zItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
+                    if (unRecounted > 0) reason.push(`缺 ${unRecounted} 項覆盤確認`);
+                    const unRandomed = zItems.filter(i => i.isRandomChecked && !i.randomDone).length;
+                    if (unRandomed > 0) reason.push(`缺 ${unRandomed} 項抽盤確認`);
+                }
+
+                const deptName = (zoneDepartments[z] || 'SFM') === 'REST' ? '🍽️ 餐廳' : '🛒 超市';
+                issuesHtml += `<div class="issue-card">
+                    <strong>[${deptName}] 📍 ${z}</strong><br>
+                    <span style="font-size:14px;">${reason.join("、")}</span>
+                </div>`;
+            }
+        });
+
+        const percent = activeZonesArray.length > 0 ? Math.round((finishedZonesCount / activeZonesArray.length) * 100) : 0;
+        document.getElementById('dashTotalPercent').innerText = `${percent}%`;
+        document.getElementById('dashProgressBar').style.width = `${percent}%`;
+        document.getElementById('dashZoneStats').innerText = `已驗收 ${finishedZonesCount} / ${activeZonesArray.length} 區`;
+        document.getElementById('dashItemStats').innerText = `已盤 ${countedItems} / ${totalItems} 項`;
+
+        let etaHtml = "";
+        let remainingItemsToCount = totalItems - countedItems;
+        if (systemStartTime && countedItems > 0 && finishedZonesCount < activeZonesArray.length) {
+            let elapsedMs = Date.now() - systemStartTime;
+            let msPerItem = elapsedMs / countedItems;
+            let msRemaining = msPerItem * remainingItemsToCount;
+            let minsRemaining = Math.max(1, Math.round(msRemaining / 60000));
+            let timeStr = minsRemaining >= 60 ? `${Math.floor(minsRemaining/60)} 小時 ${minsRemaining%60} 分鐘` : `${minsRemaining} 分鐘`;
+            etaHtml = `<span style="color:#ffeb3b;">⏳ 預估剩餘時間：約 ${timeStr}</span>`;
+        } else if (finishedZonesCount === activeZonesArray.length && activeZonesArray.length > 0) {
+            etaHtml = `<span style="color:#4CAF50;">✅ 盤點已全數完成！</span>`;
+        } else {
+            etaHtml = `<span style="color:#ccc;">⏳ 預估時間：完成首項後計算</span>`;
+        }
+        document.getElementById('dashETA').innerHTML = etaHtml;
+
+        if (issuesHtml === "") {
+            container.innerHTML = "<div style='text-align:center; color:#155724; background:#d4edda; padding:20px; border-radius:8px;'>🏆 恭喜！全館盤區皆已嚴謹驗收完成，可準備結算匯出！</div>";
+        } else {
+            container.innerHTML = issuesHtml;
+        }
+    }
+
     // === 📊 匯出資料獨立的實名制紀錄欄位 ===
     window.exportToExcel = function() {
         if (scannedItems.length === 0) { alert("目前沒有盤點資料可供匯出！"); return; }
@@ -1223,12 +1310,18 @@
         reader.readAsArrayBuffer(file);
     }
 
+    // 🐛 修復：確保先指派部門再重建快取，避免新盤區分類誤判
     window.processScan = function() {
         const codeInput = document.getElementById('itemCodeInput'); const code = codeInput.value.trim(); const zone = document.getElementById('zoneInput').value.trim();
         if (!zone) { alert("請先在第二步建立或確認『盤點區域』！"); return; }
         if (!code) return;
-        knownZones.add(zone); window.buildZoneCategoryCache(); window.renderQuickZoneButtons();
-        if(!zoneDepartments[zone]) zoneDepartments[zone] = currentDepartment; 
+        
+        knownZones.add(zone); 
+        if(!zoneDepartments[zone]) zoneDepartments[zone] = currentDepartment; // 先給定部門
+        
+        window.buildZoneCategoryCache(); // 再更新快取
+        window.renderQuickZoneButtons(); // 再重繪按鈕
+        
         if (productDatabase[code]) { window.addToInventoryList(code, productDatabase[code].name, productDatabase[code].unit, zone); codeInput.value = ""; } 
         else { document.getElementById('manualAddSection').classList.remove('hidden'); document.getElementById('manualCode').value = code; }
     }
@@ -1320,7 +1413,6 @@
         }
     }
 
-    // === 🙈 核心升級：盲盤模式隱藏即時差異計算 ===
     window.calculateVerifyDiff = function() {
         const diffEl = document.getElementById('verifyScanDiff');
         
@@ -1424,13 +1516,18 @@
         }
     }
 
-    // === 🔒 核心升級二：盲盤模式列表輸入核對 ===
+    // === 🛡️ 核心修復二：加入 submitBlindListVerify 防呆機制 ===
     window.submitBlindListVerify = function(itemId) {
         const actualInput = document.getElementById(`blindVerifyInputList-${itemId}`).value;
         const actualQty = parseFloat(actualInput);
         if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的數量！"); return; }
         
         const item = scannedItems.find(i => i.id === itemId);
+        if (!item) { 
+            alert("⚠️ 找不到該商品，可能已被其他裝置刪除，請重新整理後再試。"); 
+            return; 
+        }
+        
         const expectedQty = parseFloat(item.initialQty) || 0;
 
         if (actualQty === expectedQty) {
@@ -1569,7 +1666,6 @@
                 sigHTML = `<img id="sigImage-${item.id}" class="sig-preview hidden">`;
             }
 
-            // === 🔒 核心升級二：盲盤模式列表 UI 動態切換 ===
             let actionHTML = '';
             if (isBlindCountMode && currentCountMode !== 'initial') {
                 actionHTML = `
