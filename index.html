@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - IKEA 極簡與嚴格稽核版</title>
+    <title>SFM 完整盤點系統 - IKEA 極簡效能修復版</title>
     
     <!-- 引入 Noto Sans TC 字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,8 +40,8 @@
         .content { padding: 80px 20px 90px 20px; max-width: 800px; margin: 0 auto; }
         .hidden { display: none !important; }
 
-        /* === 頂部導覽列 === */
-        .header { 
+        /* === 頂端全域導覽列 === */
+        .global-header { 
             position: fixed;
             top: 0;
             left: 0;
@@ -59,8 +59,8 @@
             z-index: 500;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        .header .display-month { color: var(--ikea-white); text-decoration: none; margin: 0 4px; }
-        .home-btn { 
+        .global-header .display-month { color: var(--ikea-white); text-decoration: none; margin: 0 4px; }
+        .global-back-btn { 
             position: absolute; 
             left: 16px; 
             background: none; 
@@ -74,9 +74,20 @@
             align-items: center;
             gap: 4px;
         }
-        .home-btn:hover { opacity: 0.8; }
+        .global-back-btn:hover { opacity: 0.8; }
 
-        /* === 底部導覽列 === */
+        /* === 頁面大標題 === */
+        .tab-title { 
+            text-align: center; 
+            color: var(--ikea-blue); 
+            margin-top: 0;
+            margin-bottom: 24px; 
+            font-size: 24px; 
+            font-weight: 900; 
+            letter-spacing: 0.5px;
+        }
+
+        /* === 底部導覽列 (Bottom Navbar) === */
         .navbar { 
             position: fixed; 
             bottom: 0; 
@@ -110,7 +121,7 @@
             background-color: var(--ikea-blue); border-radius: 2px; margin-top: 2px;
         }
 
-        /* === 按鈕設計 === */
+        /* === 按鈕設計 (Buttons) === */
         .btn { 
             width: 100%; padding: 14px; border: none; border-radius: 8px; 
             cursor: pointer; font-weight: 700; font-size: 16px; margin-bottom: 12px; 
@@ -130,7 +141,7 @@
         .btn-danger:hover { background-color: #fef2f2; }
         .btn-blue { background-color: var(--ikea-blue); color: var(--ikea-white); }
 
-        /* === 區塊容器 === */
+        /* === 區塊容器 (Cards & Inputs) === */
         .input-group { 
             background: var(--ikea-white); 
             padding: 20px; 
@@ -191,7 +202,7 @@
         
         .zone-btn { 
             background: var(--ikea-white); border: 1px solid var(--ikea-border); border-radius: 12px; 
-            padding: 16px; margin-bottom: 12px; width: 100%; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
+            padding: 16px 20px; margin-bottom: 12px; width: 100%; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
             display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s;
         }
         .zone-btn:hover { border-color: #cbd5e1; }
@@ -200,11 +211,20 @@
         .zone-badge.complete { background: #eff6ff; color: #16a34a; font-weight: 700; }
         .zone-badge.pending { background: #fffbeb; color: #d97706; font-weight: 700; }
 
-        /* === 表格設計 === */
-        table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; background: var(--ikea-white); border-radius: 8px; overflow: hidden; border: 1px solid var(--ikea-border); }
+        /* === 表格設計 (解決換行問題) === */
+        .table-wrapper { width: 100%; overflow-x: auto; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; background: var(--ikea-white); border-radius: 8px; border: 1px solid var(--ikea-border); }
         th, td { border-bottom: 1px solid var(--ikea-border); padding: 12px 10px; text-align: left; }
         th { background-color: #f8fafc; color: #475569; font-weight: 700; font-size: 13px; }
         tr:last-child td { border-bottom: none; }
+
+        /* 強制狀態與操作欄位不換行 */
+        .checklist-table th:nth-child(2), .checklist-table td:nth-child(2),
+        .checklist-table th:nth-child(3), .checklist-table td:nth-child(3),
+        .history-table th:nth-child(5), .history-table td:nth-child(5) {
+            white-space: nowrap;
+            width: 1%;
+        }
 
         .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block;}
         .status-green { background: #eff6ff; color: var(--ikea-blue); }
@@ -245,19 +265,22 @@
 </head>
 <body>
 
+    <!-- 右上角雲端狀態 -->
     <div id="syncStatus">
         <span class="sync-dot"></span> <span id="syncText">系統初始化中...</span>
     </div>
 
-    <div class="content">
-        <!-- ================= 頂端導覽列 ================= -->
-        <div class="header">
-            <button class="home-btn hidden" id="headerBackBtn" onclick="window.goBack()">❮ 返回</button>
-            <span style="display:flex; align-items:center; gap:8px;">📦 盤點系統 <span class="display-month" style="font-size:14px; font-weight:500; opacity:0.9; cursor:pointer;" onclick="window.changeMonth()"></span></span>
-        </div>
+    <!-- 頂端全域導覽列 -->
+    <div class="global-header">
+        <button class="global-back-btn hidden" id="globalBackBtn" onclick="window.goBack()">❮ 返回</button>
+        <span style="display:flex; align-items:center; gap:8px;">📦 盤點系統 <span class="display-month" style="font-size:14px; font-weight:500; opacity:0.9; cursor:pointer;" onclick="window.changeMonth()"></span></span>
+    </div>
 
+    <div class="content">
         <!-- ================= 分頁 0：系統首頁 ================= -->
         <div id="tab-home">
+            <h2 class="tab-title">🏠 系統首頁</h2>
+
             <div class="input-group" style="background-color: transparent; border: 1px dashed #cbd5e1;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 14px; font-weight: 500; color: #475569;">👤 目前操作員：<strong id="displayOperatorName" style="color:var(--ikea-blue); font-size: 16px;">未設定</strong></span>
@@ -306,6 +329,8 @@
 
         <!-- ================= 分頁 1：製作盤單 ================= -->
         <div id="tab-create" class="hidden">
+            <h2 class="tab-title">📋 製作盤單</h2>
+            
             <div class="dept-switcher">
                 <button class="dept-btn active" data-dept="SFM" onclick="window.setDepartment('SFM')">超市與美食</button>
                 <button class="dept-btn" data-dept="REST" onclick="window.setDepartment('REST')">IKEA 餐廳</button>
@@ -349,10 +374,12 @@
 
             <div id="zoneSpecificTableContainer">
                 <h4 style="color: var(--ikea-dark); padding-bottom: 8px; margin-bottom: 8px;">📍 本區待盤點商品</h4>
-                <table id="inventoryTable" class="hidden">
-                    <thead><tr><th>區</th><th>貨號</th><th>品名</th><th style="width:60px; text-align:center;">操作</th></tr></thead>
-                    <tbody id="tableBody"></tbody>
-                </table>
+                <div class="table-wrapper">
+                    <table id="inventoryTable" class="hidden">
+                        <thead><tr><th>區</th><th>貨號</th><th>品名</th><th style="width:60px; text-align:center;">操作</th></tr></thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
                 <p id="emptyTableMsg" style="text-align:center; color:#888; font-size:14px; margin-top:20px;">目前尚無商品，請先選擇上方盤區。</p>
             </div>
             
@@ -371,13 +398,15 @@
                 <label>📋 第四步：本部門遺漏檢查清單</label>
                 <div id="checklistTabsContainer" class="category-tabs"></div>
                 <div id="checklistOverallStatus"></div>
-                <div id="zoneChecklistContainer"></div>
+                <div class="table-wrapper" id="zoneChecklistContainer"></div>
             </div>
         </div>
 
         <!-- ================= 分頁 2：現場盤點 ================= -->
         <div id="tab-count" class="hidden">
             <div id="view-zone-list">
+                <h2 class="tab-title">📱 現場盤點</h2>
+                
                 <div class="dept-switcher">
                     <button class="dept-btn active" data-dept="SFM" onclick="window.setDepartment('SFM')">超市與美食</button>
                     <button class="dept-btn" data-dept="REST" onclick="window.setDepartment('REST')">IKEA 餐廳</button>
@@ -389,6 +418,8 @@
             </div>
 
             <div id="view-zone-detail" class="hidden">
+                <h2 class="tab-title" id="currentZoneTitle" style="margin-bottom: 16px;">盤區名稱</h2>
+                
                 <div style="display: flex; gap: 8px; margin-bottom: 8px; background: #e2e8f0; padding: 4px; border-radius: 30px;">
                     <button class="dept-btn active" id="btnModeInitial" onclick="setCountMode('initial')" style="flex:1;">初盤</button>
                     <button class="dept-btn" id="btnModeRecount" onclick="setCountMode('recount')" style="flex:1;">覆盤</button>
@@ -398,7 +429,7 @@
 
                 <div style="display: flex; gap: 12px; margin-bottom: 20px;">
                     <button class="btn btn-outline" style="padding: 12px; font-size: 15px; flex: 1; border-color:#cbd5e1;" onclick="openOnTheFlyModal()">➕ 手動新增</button>
-                    <button class="btn btn-primary" id="btnContinuousScan" style="padding: 12px; font-size: 15px; flex: 1.5; margin-bottom: 0;" onclick="startCameraScanner('count')">📷 掃描</button>
+                    <button class="btn btn-primary" id="btnContinuousScan" style="padding: 12px; font-size: 15px; flex: 1.5; margin-bottom: 0;" onclick="startCameraScanner('count')">📷 連續掃描</button>
                 </div>
 
                 <div id="inventoryListContainer"></div>
@@ -428,6 +459,8 @@
 
         <!-- ================= 分頁 4：總覽儀表板 ================= -->
         <div id="tab-dashboard" class="hidden">
+            <h2 class="tab-title">📊 總覽儀表板</h2>
+
             <!-- 數據統計卡片 (對齊效期風格) -->
             <div class="dash-summary-container">
                 <div class="stat-card blue">
@@ -458,18 +491,19 @@
 
         <!-- ================= 分頁 3：歷史紀錄 ================= -->
         <div id="tab-history" class="hidden">
+            <h2 class="tab-title">🗄️ 歷史紀錄查詢</h2>
+            
             <div id="historyListView">
                 <div id="historyListContainer"></div>
             </div>
 
             <div id="historyDetailView" class="hidden">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <button class="btn btn-outline" style="width: auto; margin: 0; padding: 8px 16px; border-color:#cbd5e1;" onclick="backToHistoryList()">❮ 返回</button>
-                    <button class="btn btn-danger" style="width: auto; margin: 0; padding: 8px 16px; font-size: 14px;" id="btnDeleteHistory">🗑️ 刪除紀錄</button>
+                    <h3 id="historyDetailTitle" style="color: var(--ikea-dark); margin: 0; font-size: 18px;"></h3>
+                    <button class="btn btn-danger" style="width: auto; margin: 0; padding: 6px 12px; font-size: 13px;" id="btnDeleteHistory">🗑️ 刪除紀錄</button>
                 </div>
                 
-                <h3 id="historyDetailTitle" style="color: var(--ikea-dark); text-align: center; margin-bottom: 20px;"></h3>
-                <div style="background: var(--ikea-white); border-radius: 12px; overflow: hidden; border: 1px solid var(--ikea-border);">
+                <div class="table-wrapper" style="background: var(--ikea-white); border-radius: 12px; border: 1px solid var(--ikea-border);">
                     <table class="history-table" style="margin-top: 0; border: none;">
                         <thead><tr><th>部</th><th>區</th><th>貨號</th><th>品名</th><th style="width:40px; text-align:center;">量</th></tr></thead>
                         <tbody id="historyDetailTableBody"></tbody>
@@ -816,11 +850,11 @@
             window.backToHistoryList();
         }
     }
-    function updateHeaderBackButton() {
-        const backBtn = document.getElementById('headerBackBtn');
-        const isZoneDetailVisible = !document.getElementById('view-zone-detail').classList.contains('hidden');
-        const isHistoryDetailVisible = !document.getElementById('historyDetailView').classList.contains('hidden');
-        if (isZoneDetailVisible || isHistoryDetailVisible) {
+    window.updateHeaderBackButton = function() {
+        const backBtn = document.getElementById('globalBackBtn');
+        const isZoneDetail = !document.getElementById('view-zone-detail').classList.contains('hidden');
+        const isHistoryDetail = !document.getElementById('historyDetailView').classList.contains('hidden');
+        if (isZoneDetail || isHistoryDetail) {
             backBtn.classList.remove('hidden');
         } else {
             backBtn.classList.add('hidden');
@@ -900,7 +934,7 @@
         if (tab === 'dashboard') { window.renderDashboard(); window.stopCameraScanner(); }
         if (tab === 'history') { window.renderHistoryList(); window.stopCameraScanner(); } 
         if (tab === 'home') { window.stopCameraScanner(); }
-        updateHeaderBackButton();
+        window.updateHeaderBackButton();
     }
 
     window.renderQuickZoneButtons = function() {
@@ -1018,7 +1052,7 @@
         let filteredZones = activeChecklistCategory !== '全部' ? zonesArray.filter(z => window.getZoneCategory(z) === activeChecklistCategory) : zonesArray;
         if (filteredZones.length === 0) { container.innerHTML = `<p style='text-align:center; color:#94a3b8; padding: 20px;'>此分類下無盤區。</p>`; return; }
 
-        let html = '<table class="checklist-table"><thead><tr><th>盤區名稱</th><th>目前狀態</th><th>操作</th></tr></thead><tbody>';
+        let html = '<div class="table-wrapper"><table class="checklist-table"><thead><tr><th>盤區名稱</th><th>目前狀態</th><th>操作</th></tr></thead><tbody>';
         filteredZones.forEach(zone => {
             if (!zoneStatus[zone]) zoneStatus[zone] = { isSkipped: false, sign_zoneInitial: null, sign_zoneRecount: null, sign_zoneRandom: null };
             const hasItems = scannedItems.some(item => item.zone === zone);
@@ -1028,7 +1062,7 @@
             else { statusBadge = '<span class="status-badge status-red">🔴 空盤區</span>'; actionBtn = `<button class="btn" style="background:#f1f5f9; border: 1px solid #cbd5e1; padding:4px 12px; font-size:12px; margin:0; color:#475569;" onclick="window.toggleZoneSkip('${zone}')">設為不盤</button>`; }
             html += `<tr><td style="font-weight:700; color:var(--ikea-blue); cursor:pointer;" onclick="window.jumpToZone('${zone}')">${zone}</td><td>${statusBadge}</td><td>${actionBtn}</td></tr>`;
         });
-        html += '</tbody></table>'; container.innerHTML = html;
+        html += '</tbody></table></div>'; container.innerHTML = html;
         savePersistedDataLocalOnly(); 
     }
 
@@ -1041,7 +1075,7 @@
         document.getElementById('view-zone-detail').classList.add('hidden'); 
         document.getElementById('view-zone-list').classList.remove('hidden'); 
         window.renderZoneDashboard(); 
-        updateHeaderBackButton();
+        window.updateHeaderBackButton();
     }
 
     window.checkZoneDone = function(z) {
@@ -1122,7 +1156,7 @@
         });
     }
 
-    // === 📊 總覽儀表板 (修復回歸，套用 IKEA 4 格卡片風格) ===
+    // === 📊 總覽儀表板 (已完美補回，修復當機) ===
     window.renderDashboard = function() {
         const container = document.getElementById('dashIssuesContainer');
         const activeZonesArray = window.sortZones([...knownZones].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
@@ -1307,7 +1341,7 @@
                     <span class="zone-badge">共 ${record.items.length} 項</span></button>`;
         });
         container.innerHTML = html;
-        updateHeaderBackButton();
+        window.updateHeaderBackButton();
     }
 
     window.viewHistoryDetail = function(index) {
@@ -1343,7 +1377,7 @@
             }
         }
         sigHtml += '</div>'; sigContainer.innerHTML = sigHtml;
-        updateHeaderBackButton();
+        window.updateHeaderBackButton();
     }
 
     window.deleteHistoryRecord = function(index) {
@@ -1359,7 +1393,7 @@
     window.backToHistoryList = function() { 
         document.getElementById('historyListView').classList.remove('hidden'); 
         document.getElementById('historyDetailView').classList.add('hidden'); 
-        updateHeaderBackButton();
+        window.updateHeaderBackButton();
     }
 
     window.handleFileUpload = function(event) {
@@ -1665,10 +1699,13 @@
     }
 
     window.openZoneDetail = function(zoneName) {
-        currentActiveZone = zoneName; document.getElementById('currentZoneTitle').innerText = zoneName;
-        document.getElementById('view-zone-list').classList.add('hidden'); document.getElementById('view-zone-detail').classList.remove('hidden');
-        window.setCountMode('initial'); window.renderZoneSignatures(); 
-        updateHeaderBackButton();
+        currentActiveZone = zoneName; 
+        document.getElementById('currentZoneTitle').innerText = zoneName;
+        document.getElementById('view-zone-list').classList.add('hidden'); 
+        document.getElementById('view-zone-detail').classList.remove('hidden');
+        window.setCountMode('initial'); 
+        window.renderZoneSignatures(); 
+        window.updateHeaderBackButton();
 
         setTimeout(() => {
             if (currentCountMode === 'initial') {
@@ -1888,7 +1925,7 @@
         ['Initial', 'Recount', 'Random'].forEach(m => {
             const btn = document.getElementById(`btnMode${m}`);
             if(mode.toLowerCase() === m.toLowerCase()) { btn.style.backgroundColor = 'var(--ikea-blue)'; btn.style.color = 'var(--ikea-white)'; btn.style.borderColor = 'var(--ikea-blue)'; } 
-            else { btn.style.backgroundColor = 'var(--ikea-white)'; btn.style.color = 'var(--ikea-gray-dark)'; btn.style.borderColor = 'var(--ikea-border)'; }
+            else { btn.style.backgroundColor = 'transparent'; btn.style.color = '#64748b'; btn.style.borderColor = 'transparent'; }
         });
         window.updateModeUI();
     }
