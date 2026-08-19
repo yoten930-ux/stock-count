@@ -503,7 +503,7 @@
                     <button class="btn btn-danger" style="width: auto; margin: 0; padding: 6px 12px; font-size: 13px;" id="btnDeleteHistory">🗑️ 刪除紀錄</button>
                 </div>
                 
-                <div class="table-wrapper" style="background: var(--ikea-white); border-radius: 12px; border: 1px solid var(--ikea-border);">
+                <div class="table-wrapper" style="background: var(--ikea-white); border-radius: 12px; overflow: hidden; border: 1px solid var(--ikea-border);">
                     <table class="history-table" style="margin-top: 0; border: none;">
                         <thead><tr><th>部</th><th>區</th><th>貨號</th><th>品名</th><th style="width:40px; text-align:center;">量</th></tr></thead>
                         <tbody id="historyDetailTableBody"></tbody>
@@ -842,7 +842,7 @@
     }
     window.updateHeaderMonth = function() { document.querySelectorAll('.display-month').forEach(el => el.innerText = currentInventoryMonth); }
 
-    // === 🔙 返回按鈕動態顯示邏輯 ===
+    // === 🔙 修復：返回按鈕動態顯示邏輯 ===
     window.goBack = function() {
         if (!document.getElementById('view-zone-detail').classList.contains('hidden')) {
             window.backToZoneList();
@@ -852,6 +852,7 @@
     }
     window.updateHeaderBackButton = function() {
         const backBtn = document.getElementById('globalBackBtn');
+        if(!backBtn) return;
         const isZoneDetail = !document.getElementById('view-zone-detail').classList.contains('hidden');
         const isHistoryDetail = !document.getElementById('historyDetailView').classList.contains('hidden');
         if (isZoneDetail || isHistoryDetail) {
@@ -1156,7 +1157,7 @@
         });
     }
 
-    // === 📊 總覽儀表板 (已完美補回，修復當機) ===
+    // === 📊 修復：總覽儀表板渲染邏輯 ===
     window.renderDashboard = function() {
         const container = document.getElementById('dashIssuesContainer');
         const activeZonesArray = window.sortZones([...knownZones].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
@@ -1750,15 +1751,15 @@
         
         if (unCounted > 0 || unRecounted > 0) {
             btnRandom.disabled = true;
-            if (unCounted > 0) hintTexts.push(`缺 ${unCounted} 項初盤`);
-            if (unRecounted > 0) hintTexts.push(`缺 ${unRecounted} 項覆核`);
+            if (unCounted > 0) hintTexts.push(`缺 ${unCounted} 初盤`);
+            if (unRecounted > 0) hintTexts.push(`缺 ${unRecounted} 覆核`);
         } else {
             btnRandom.disabled = false;
         }
         
         if (currentCountMode === 'recount' && unCounted > 0) {
-            hintEl.innerHTML = `⚠️ 尚有 ${unCounted} 項未初盤，已暫時隱藏`;
-            hintEl.style.color = 'var(--ikea-yellow-hover)';
+            hintEl.innerHTML = `⚠️ 尚有 ${unCounted} 項未初盤，暫不顯示`;
+            hintEl.style.color = '#d97706';
         } else if (currentCountMode === 'random' && hintTexts.length > 0) {
             hintEl.innerHTML = `⚠️ 無法抽盤：${hintTexts.join('、')}`;
             hintEl.style.color = 'var(--ikea-red)';
@@ -1766,7 +1767,7 @@
             hintEl.innerHTML = `📌 抽盤鎖定中：${hintTexts.join('、')}`;
             hintEl.style.color = 'var(--ikea-gray-dark)';
         } else {
-            hintEl.innerHTML = `✅ 全區覆核完成，可進行抽盤。`;
+            hintEl.innerHTML = `✅ 覆核完成，可進行抽盤。`;
             hintEl.style.color = 'var(--ikea-green)';
         }
     }
