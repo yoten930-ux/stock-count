@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 儀表板互動篩選版</title>
+    <title>SFM 完整盤點系統 - IKEA 極簡效能修復版</title>
     
     <!-- 引入 Noto Sans TC 字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -244,18 +244,21 @@
         #syncStatus { position: fixed; top: 16px; right: 16px; background: rgba(255,255,255,0.95); color: var(--ikea-dark); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; z-index: 2000; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); backdrop-filter: blur(4px);}
         .sync-dot { width: 8px; height: 8px; background: #ccc; border-radius: 50%; display: inline-block; }
 
-        /* === 儀表板特製設計 (4格數據 - 加入點擊互動) === */
+        /* === 儀表板特製設計 (4格數據) === */
         .dash-summary-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
         .stat-card { 
             background: var(--ikea-white); padding: 16px; border-radius: 12px; 
             border: 1px solid var(--ikea-border); text-align: center; 
             box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-            cursor: pointer; /* 讓卡片可點擊 */
+            cursor: pointer; 
             transition: all 0.2s ease;
         }
         .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         
-        /* 被選中的卡片樣式 */
+        /* 靜態卡片，不顯示點擊特效與游標 */
+        .stat-card.static { cursor: default; }
+        .stat-card.static:hover { transform: none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+        
         .stat-card.active-filter { box-shadow: 0 0 0 3px var(--ikea-dark); transform: scale(0.98); }
 
         .stat-card.blue { background: var(--ikea-blue); color: white; border-color: var(--ikea-blue); }
@@ -275,7 +278,6 @@
 </head>
 <body>
 
-    <!-- 右上角雲端狀態 -->
     <div id="syncStatus">
         <span class="sync-dot"></span> <span id="syncText">系統初始化中...</span>
     </div>
@@ -471,7 +473,7 @@
         <div id="tab-dashboard" class="hidden">
             <h2 class="tab-title">📊 總覽儀表板</h2>
 
-            <!-- 數據統計卡片 (加入互動篩選事件) -->
+            <!-- 數據統計卡片 -->
             <div class="dash-summary-container">
                 <div class="stat-card blue" id="cardDashAll" onclick="window.setDashFilter('all')">
                     <div class="stat-num" id="dashTotalPercent">0%</div>
@@ -485,7 +487,7 @@
                     <div class="stat-num" id="dashIssuesVal">0</div>
                     <div class="stat-label">異常/待處理</div>
                 </div>
-                <div class="stat-card" id="cardDashItems" onclick="window.setDashFilter('all')" style="background:#f8fafc; border-color:#e2e8f0; color:#475569;">
+                <div class="stat-card static" id="cardDashItems" style="background:#f8fafc; border-color:#e2e8f0; color:#475569;">
                     <div class="stat-num" id="dashItemStatsVal" style="color:#334155;">0</div>
                     <div class="stat-label">已盤商品數</div>
                 </div>
@@ -495,7 +497,6 @@
                 ⏳ 預估剩餘時間：系統計算中...
             </div>
 
-            <!-- 動態切換的清單標題 -->
             <h3 id="dashIssuesTitle" style="color: var(--ikea-dark); font-size: 18px; margin-bottom: 12px;">⚠️ 待處理清單 (未完成)</h3>
             <div id="dashIssuesContainer"></div>
         </div>
@@ -645,9 +646,7 @@
     let activeDashboardCategory = '全部';
     let lastScanCode = ''; let lastScanTime = 0; let scanMode = 'create';
     let isFirstLoad = true;
-
-    // === 全域篩選變數 (Dashboard) ===
-    let dashFilterMode = 'pending'; // 預設顯示待處理
+    let dashFilterMode = 'pending';
 
     window.isVerifying = false;
     window.verifyItemId = null;
@@ -856,7 +855,6 @@
     }
     window.updateHeaderMonth = function() { document.querySelectorAll('.display-month').forEach(el => el.innerText = currentInventoryMonth); }
 
-    // === 返回按鈕動態顯示邏輯 ===
     window.goBack = function() {
         if (!document.getElementById('view-zone-detail').classList.contains('hidden')) {
             window.backToZoneList();
@@ -864,11 +862,17 @@
             window.backToHistoryList();
         }
     }
+
     window.updateHeaderBackButton = function() {
         const backBtn = document.getElementById('globalBackBtn');
         if(!backBtn) return;
-        const isZoneDetail = !document.getElementById('view-zone-detail').classList.contains('hidden');
-        const isHistoryDetail = !document.getElementById('historyDetailView').classList.contains('hidden');
+        
+        const countTabVisible = !document.getElementById('tab-count').classList.contains('hidden');
+        const historyTabVisible = !document.getElementById('tab-history').classList.contains('hidden');
+        
+        const isZoneDetail = countTabVisible && !document.getElementById('view-zone-detail').classList.contains('hidden');
+        const isHistoryDetail = historyTabVisible && !document.getElementById('historyDetailView').classList.contains('hidden');
+        
         if (isZoneDetail || isHistoryDetail) {
             backBtn.classList.remove('hidden');
         } else {
@@ -949,6 +953,7 @@
         if (tab === 'dashboard') { window.renderDashboard(); window.stopCameraScanner(); }
         if (tab === 'history') { window.renderHistoryList(); window.stopCameraScanner(); } 
         if (tab === 'home') { window.stopCameraScanner(); }
+        
         window.updateHeaderBackButton();
     }
 
@@ -1171,13 +1176,11 @@
         });
     }
 
-    // === 👆 動態切換儀表板過濾器 ===
     window.setDashFilter = function(mode) {
         dashFilterMode = mode;
         window.renderDashboard();
     }
 
-    // === 📊 總覽儀表板 (支援互動篩選) ===
     window.renderDashboard = function() {
         const container = document.getElementById('dashIssuesContainer');
         const activeZonesArray = window.sortZones([...knownZones].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
@@ -1189,7 +1192,6 @@
         let finishedZonesCount = 0;
         let issuesCount = 0; 
 
-        // 建立三個分類的 HTML 字串暫存
         let pendingHtml = "";
         let completedHtml = "";
         let allHtml = "";
@@ -1264,14 +1266,13 @@
             }
         });
 
-        // 更新上方 4 個統計數字卡片
         const percent = activeZonesArray.length > 0 ? Math.round((finishedZonesCount / activeZonesArray.length) * 100) : 0;
         document.getElementById('dashTotalPercent').innerText = `${percent}%`;
+        
         document.getElementById('dashZoneStatsVal').innerText = finishedZonesCount;
         document.getElementById('dashItemStatsVal').innerText = countedItems;
         document.getElementById('dashIssuesVal').innerText = issuesCount;
 
-        // 計算 ETA
         let etaHtml = "";
         let remainingItemsToCount = totalItems - countedItems;
         if (systemStartTime && countedItems > 0 && finishedZonesCount < activeZonesArray.length) {
@@ -1288,7 +1289,6 @@
         }
         document.getElementById('dashETA').innerText = etaHtml;
 
-        // 依據選擇的狀態套用 Active 樣式
         document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active-filter'));
         if(dashFilterMode === 'all') {
             document.getElementById('cardDashAll').classList.add('active-filter');
@@ -1296,12 +1296,11 @@
         } else if(dashFilterMode === 'completed') {
             document.getElementById('cardDashCompleted').classList.add('active-filter');
             document.getElementById('dashIssuesTitle').innerText = '✅ 已驗收盤區清單';
-        } else { // pending
+        } else {
             document.getElementById('cardDashPending').classList.add('active-filter');
             document.getElementById('dashIssuesTitle').innerText = '⚠️ 待處理清單 (未完成)';
         }
 
-        // 決定要渲染進畫面的 HTML
         let finalHtml = "";
         if (dashFilterMode === 'all') finalHtml = allHtml || "<p style='text-align:center; color:#94a3b8; padding: 20px;'>目前尚無任何資料。</p>";
         else if (dashFilterMode === 'completed') finalHtml = completedHtml || "<p style='text-align:center; color:#94a3b8; padding: 20px;'>目前尚無已驗收完成的盤區。</p>";
@@ -1813,7 +1812,7 @@
         
         if (currentCountMode === 'recount' && unCounted > 0) {
             hintEl.innerHTML = `⚠️ 尚有 ${unCounted} 項未初盤，暫不顯示`;
-            hintEl.style.color = '#d97706';
+            hintEl.style.color = 'var(--ikea-yellow-hover)';
         } else if (currentCountMode === 'random' && hintTexts.length > 0) {
             hintEl.innerHTML = `⚠️ 無法抽盤：${hintTexts.join('、')}`;
             hintEl.style.color = 'var(--ikea-red)';
@@ -1918,7 +1917,7 @@
                     container.innerHTML = "<div style='text-align:center; background:#eff6ff; color:var(--ikea-blue); padding:24px; border-radius:12px; border:1px solid #dbeafe;'><h3 style='margin:0 0 8px 0;'>🎉 太棒了！</h3><p style='margin:0;'>目前已初盤的項目都覆盤完畢了，其餘商品初盤後會自動出現。</p></div>";
                 }
             } else if (currentCountMode === 'initial') {
-                container.innerHTML = "<p style='text-align:center; color:#94a3b8; padding: 20px;'>本區尚無商品。</p>";
+                container.innerHTML = "<p style='text-align:center; color:var(--ikea-gray-dark); padding: 20px;'>本區尚無商品。</p>";
             }
         }
         
