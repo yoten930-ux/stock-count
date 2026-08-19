@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - IKEA 極簡效能修復版</title>
+    <title>SFM 完整盤點系統 - 效能修復與 IKEA 極簡版</title>
     
     <!-- 引入 Noto Sans TC 字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -218,12 +218,10 @@
         th { background-color: #f8fafc; color: #475569; font-weight: 700; font-size: 13px; }
         tr:last-child td { border-bottom: none; }
 
-        /* 強制狀態與操作欄位不換行 */
         .checklist-table th:nth-child(2), .checklist-table td:nth-child(2),
         .checklist-table th:nth-child(3), .checklist-table td:nth-child(3),
         .history-table th:nth-child(5), .history-table td:nth-child(5) {
-            white-space: nowrap;
-            width: 1%;
+            white-space: nowrap; width: 1%;
         }
 
         .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block;}
@@ -1157,7 +1155,7 @@
         });
     }
 
-    // === 📊 修復：總覽儀表板渲染邏輯 ===
+    // === 👨‍💻 徹底修復：移除會造成系統崩潰的進度條，完美連接 4 格卡片 ===
     window.renderDashboard = function() {
         const container = document.getElementById('dashIssuesContainer');
         const activeZonesArray = window.sortZones([...knownZones].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
@@ -1226,9 +1224,9 @@
         });
 
         const percent = activeZonesArray.length > 0 ? Math.round((finishedZonesCount / activeZonesArray.length) * 100) : 0;
-        document.getElementById('dashTotalPercent').innerText = `${percent}%`;
-        document.getElementById('dashProgressBar').style.width = `${percent}%`;
         
+        // 精準填入全新的四格數據卡片，移除了會導致當機的 dashProgressBar
+        document.getElementById('dashTotalPercent').innerText = `${percent}%`;
         document.getElementById('dashZoneStatsVal').innerText = finishedZonesCount;
         document.getElementById('dashItemStatsVal').innerText = countedItems;
         document.getElementById('dashIssuesVal').innerText = issuesCount;
