@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 品牌一致性極簡版</title>
+    <title>SFM 完整盤點系統 - IKEA 極簡與嚴格稽核版</title>
     
     <!-- 引入 Noto Sans TC 字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,7 +13,7 @@
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        /* === 顏色變數定義 (對齊效期管理風格) === */
+        /* === 顏色變數定義 (IKEA Brand Colors) === */
         :root {
             --ikea-blue: #0058a3;
             --ikea-yellow: #fbd914;
@@ -37,11 +37,10 @@
             line-height: 1.5;
             -webkit-font-smoothing: antialiased;
         }
-        /* 增加上方 padding 給固定式 Header */
         .content { padding: 80px 20px 90px 20px; max-width: 800px; margin: 0 auto; }
         .hidden { display: none !important; }
 
-        /* === 頂部導覽列 (對齊截圖風格) === */
+        /* === 頂部導覽列 === */
         .header { 
             position: fixed;
             top: 0;
@@ -77,7 +76,7 @@
         }
         .home-btn:hover { opacity: 0.8; }
 
-        /* === 底部導覽列 (Bottom Navbar) === */
+        /* === 底部導覽列 === */
         .navbar { 
             position: fixed; 
             bottom: 0; 
@@ -111,7 +110,7 @@
             background-color: var(--ikea-blue); border-radius: 2px; margin-top: 2px;
         }
 
-        /* === 按鈕設計 (Buttons) === */
+        /* === 按鈕設計 === */
         .btn { 
             width: 100%; padding: 14px; border: none; border-radius: 8px; 
             cursor: pointer; font-weight: 700; font-size: 16px; margin-bottom: 12px; 
@@ -131,7 +130,7 @@
         .btn-danger:hover { background-color: #fef2f2; }
         .btn-blue { background-color: var(--ikea-blue); color: var(--ikea-white); }
 
-        /* === 區塊容器 (Cards & Inputs) === */
+        /* === 區塊容器 === */
         .input-group { 
             background: var(--ikea-white); 
             padding: 20px; 
@@ -151,7 +150,7 @@
             outline: none; border-color: var(--ikea-blue); box-shadow: 0 0 0 3px rgba(0,88,163,0.1);
         }
 
-        /* === 膠囊式切換器 (Pill Tabs - 效期風格) === */
+        /* === 膠囊式切換器 === */
         .dept-switcher, .category-tabs { 
             display: flex; flex-wrap: wrap; gap: 6px; 
             background: #e2e8f0; border-radius: 30px; padding: 4px; margin-bottom: 20px;
@@ -164,7 +163,7 @@
         .dept-btn.active, .cat-tab.active { 
             background: var(--ikea-white); color: var(--ikea-blue); box-shadow: 0 2px 6px rgba(0,0,0,0.05); 
         }
-        .cat-tab { flex: 0 1 auto; padding: 8px 16px; font-size: 14px; } /* 盤區籤不需要均分寬度 */
+        .cat-tab { flex: 0 1 auto; padding: 8px 16px; font-size: 14px; }
         
         .quick-zone-builder { background: transparent; }
         .quick-zone-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
@@ -180,7 +179,7 @@
         .home-menu-btn h3 { margin: 0 0 6px 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px;}
         .home-menu-btn p { margin: 0; font-size: 13px; color: var(--ikea-gray-dark); line-height: 1.4; }
 
-        /* === 盤點卡片 (Inventory Cards - 效期風格) === */
+        /* === 盤點卡片 === */
         .card { 
             background: var(--ikea-white); border-radius: 12px; padding: 16px; margin-bottom: 12px; 
             border: 1px solid var(--ikea-border); border-left: 5px solid #cbd5e1; 
@@ -226,7 +225,7 @@
         #syncStatus { position: fixed; top: 16px; right: 16px; background: rgba(255,255,255,0.95); color: var(--ikea-dark); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; z-index: 2000; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); backdrop-filter: blur(4px);}
         .sync-dot { width: 8px; height: 8px; background: #ccc; border-radius: 50%; display: inline-block; }
 
-        /* === 儀表板特製設計 (仿效期卡片) === */
+        /* === 儀表板特製設計 (4格數據) === */
         .dash-summary-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
         .stat-card { background: var(--ikea-white); padding: 16px; border-radius: 12px; border: 1px solid var(--ikea-border); text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.02);}
         .stat-card.blue { background: var(--ikea-blue); color: white; border-color: var(--ikea-blue); }
@@ -259,7 +258,6 @@
 
         <!-- ================= 分頁 0：系統首頁 ================= -->
         <div id="tab-home">
-            <!-- 系統進階設定 (實名制與盲盤) -->
             <div class="input-group" style="background-color: transparent; border: 1px dashed #cbd5e1;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 14px; font-weight: 500; color: #475569;">👤 目前操作員：<strong id="displayOperatorName" style="color:var(--ikea-blue); font-size: 16px;">未設定</strong></span>
@@ -313,8 +311,8 @@
                 <button class="dept-btn" data-dept="REST" onclick="window.setDepartment('REST')">IKEA 餐廳</button>
             </div>
 
-            <div class="input-group">
-                <label>📁 第一步：更新商品主檔與盤區設定</label>
+            <div class="input-group" style="border-left: 4px solid var(--ikea-blue);">
+                <label>📁 第一步：更新商品主檔與盤區</label>
                 <input type="file" id="excelUpload" accept=".xlsx, .xls" onchange="handleFileUpload(event)">
                 <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px;">
                     <input type="checkbox" id="importItemsCheckbox" checked style="width: 18px; height: 18px; accent-color: var(--ikea-blue);">
@@ -328,23 +326,23 @@
                 <label>第二步：快速切換盤點區域</label>
                 <div class="quick-zone-builder">
                     <div class="category-tabs" id="quickZoneCategories">
-                        <button class="cat-tab" onclick="selectQuickZonePrefix('自訂')">自訂</button>
+                        <button class="cat-tab" onclick="selectQuickZonePrefix('自訂')">✍️ 自訂</button>
                     </div>
                     <div class="quick-zone-row">
                         <input type="text" id="quickZonePrefix" placeholder="前綴" style="width:25%; background:#f1f5f9; text-align:center; border-color:transparent;" readonly>
-                        <span style="font-weight:bold; color:#cbd5e1;">+</span>
+                        <span style="font-weight:bold; color:var(--ikea-gray-dark);">+</span>
                         <input type="number" inputmode="numeric" min="0" id="quickZoneSuffix" placeholder="號碼" style="width:35%;" onkeyup="updateFinalZone()" onchange="updateFinalZone()">
-                        <span style="font-weight:bold; color:#cbd5e1;">=</span>
+                        <span style="font-weight:bold; color:var(--ikea-gray-dark);">=</span>
                         <input type="text" id="zoneInput" placeholder="最終盤區" style="width:40%; background:#eff6ff; font-weight:bold; color:var(--ikea-blue); border-color:#bfdbfe;" readonly onkeyup="updateCustomZone()">
                     </div>
                 </div>
             </div>
 
             <div class="input-group">
-                <label>第三步：手動輸入或掃描貨號加入盤單</label>
+                <label>第三步：手動輸入或掃描加入</label>
                 <div style="display:flex; gap:10px; margin-bottom: 12px;">
                     <input type="text" id="itemCodeInput" placeholder="輸入商品條碼...">
-                    <button class="btn btn-outline" style="width:auto; margin-bottom:0; padding: 0 16px; border-radius: 8px; border-color: #cbd5e1;" onclick="startCameraScanner('create')" title="相機掃描">📷</button>
+                    <button class="btn btn-blue" style="width:auto; margin-bottom:0; padding: 0 16px; border-radius: 8px;" onclick="startCameraScanner('create')" title="相機掃描">📷</button>
                 </div>
                 <button class="btn btn-primary" onclick="processScan()">加入清單</button>
             </div>
@@ -352,10 +350,10 @@
             <div id="zoneSpecificTableContainer">
                 <h4 style="color: var(--ikea-dark); padding-bottom: 8px; margin-bottom: 8px;">📍 本區待盤點商品</h4>
                 <table id="inventoryTable" class="hidden">
-                    <thead><tr><th>盤區</th><th>貨號</th><th>品名</th><th style="width:50px; text-align:center;">操作</th></tr></thead>
+                    <thead><tr><th>區</th><th>貨號</th><th>品名</th><th style="width:60px; text-align:center;">操作</th></tr></thead>
                     <tbody id="tableBody"></tbody>
                 </table>
-                <p id="emptyTableMsg" style="text-align:center; color:#94a3b8; font-size:14px; margin-top:20px;">目前尚無商品，請先於上方選擇盤區。</p>
+                <p id="emptyTableMsg" style="text-align:center; color:#888; font-size:14px; margin-top:20px;">目前尚無商品，請先選擇上方盤區。</p>
             </div>
             
             <div id="manualAddSection" class="hidden" style="background: #fffbeb; padding: 16px; border-radius: 12px; margin-bottom: 16px; margin-top:16px; border: 1px solid #fde68a;">
@@ -365,7 +363,7 @@
                 <input type="text" id="manualUnit" placeholder="單位 (例: 箱、個)" style="margin-bottom:12px; background:#fff;">
                 <div style="display:flex; gap:10px;">
                     <button class="btn btn-outline" style="margin-bottom:0; border-color:transparent;" onclick="cancelManualItem()">取消</button>
-                    <button class="btn btn-primary" style="margin-bottom:0;" onclick="saveManualItem()">存入並加入</button>
+                    <button class="btn btn-success" style="margin-bottom:0;" onclick="saveManualItem()">存入並加入</button>
                 </div>
             </div>
 
@@ -391,8 +389,8 @@
             </div>
 
             <div id="view-zone-detail" class="hidden">
-                <div class="dept-switcher" style="padding: 4px; background: #e2e8f0;">
-                    <button class="dept-btn" id="btnModeInitial" onclick="setCountMode('initial')" style="flex:1;">初盤</button>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px; background: #e2e8f0; padding: 4px; border-radius: 30px;">
+                    <button class="dept-btn active" id="btnModeInitial" onclick="setCountMode('initial')" style="flex:1;">初盤</button>
                     <button class="dept-btn" id="btnModeRecount" onclick="setCountMode('recount')" style="flex:1;">覆盤</button>
                     <button class="dept-btn" id="btnModeRandom" onclick="setCountMode('random')" style="flex:1;">抽盤</button>
                 </div>
@@ -400,7 +398,7 @@
 
                 <div style="display: flex; gap: 12px; margin-bottom: 20px;">
                     <button class="btn btn-outline" style="padding: 12px; font-size: 15px; flex: 1; border-color:#cbd5e1;" onclick="openOnTheFlyModal()">➕ 手動新增</button>
-                    <button class="btn btn-primary" id="btnContinuousScan" style="padding: 12px; font-size: 15px; flex: 1.5; margin-bottom: 0;" onclick="startCameraScanner('count')">📷 連續掃描</button>
+                    <button class="btn btn-primary" id="btnContinuousScan" style="padding: 12px; font-size: 15px; flex: 1.5; margin-bottom: 0;" onclick="startCameraScanner('count')">📷 掃描</button>
                 </div>
 
                 <div id="inventoryListContainer"></div>
@@ -454,6 +452,7 @@
                 ⏳ 預估剩餘時間：系統計算中...
             </div>
 
+            <h3 style="color: var(--ikea-dark); font-size: 18px; margin-bottom: 12px;">⚠️ 待處理清單 (未完成)</h3>
             <div id="dashIssuesContainer"></div>
         </div>
 
@@ -465,7 +464,7 @@
 
             <div id="historyDetailView" class="hidden">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <button class="btn btn-outline" style="width: auto; margin: 0; padding: 8px 16px; border-color:#cbd5e1;" onclick="backToHistoryList()">&lt; 返回</button>
+                    <button class="btn btn-outline" style="width: auto; margin: 0; padding: 8px 16px; border-color:#cbd5e1;" onclick="backToHistoryList()">❮ 返回</button>
                     <button class="btn btn-danger" style="width: auto; margin: 0; padding: 8px 16px; font-size: 14px;" id="btnDeleteHistory">🗑️ 刪除紀錄</button>
                 </div>
                 
@@ -566,7 +565,6 @@
         </div>
     </div>
 
-<!-- ================= 加入 Firebase ES 模組 ================= -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
@@ -810,7 +808,7 @@
     }
     window.updateHeaderMonth = function() { document.querySelectorAll('.display-month').forEach(el => el.innerText = currentInventoryMonth); }
 
-    // 處理頂部 Header 左側返回鍵的顯示與邏輯
+    // === 🔙 返回按鈕動態顯示邏輯 ===
     window.goBack = function() {
         if (!document.getElementById('view-zone-detail').classList.contains('hidden')) {
             window.backToZoneList();
@@ -822,7 +820,6 @@
         const backBtn = document.getElementById('headerBackBtn');
         const isZoneDetailVisible = !document.getElementById('view-zone-detail').classList.contains('hidden');
         const isHistoryDetailVisible = !document.getElementById('historyDetailView').classList.contains('hidden');
-        
         if (isZoneDetailVisible || isHistoryDetailVisible) {
             backBtn.classList.remove('hidden');
         } else {
@@ -832,7 +829,11 @@
 
     window.setDepartment = function(dept) {
         currentDepartment = dept;
-        document.querySelectorAll('.dept-btn').forEach(btn => { btn.classList.toggle('active', btn.dataset.dept === dept); });
+        document.querySelectorAll('.dept-btn').forEach(btn => { 
+            if(btn.dataset.dept) {
+                btn.classList.toggle('active', btn.dataset.dept === dept); 
+            }
+        });
         window.buildZoneCategoryCache(); 
         window.renderQuickZoneButtons(); 
         window.renderZoneChecklist(); 
@@ -915,7 +916,7 @@
                 html += `<button class="cat-tab" onclick="selectQuickZonePrefix('${basePrefix}', this)">${cat}</button>`;
             }
         });
-        html += `<button class="cat-tab" onclick="selectQuickZonePrefix('自訂', this)" style="background-color: #fff8d6; color: #9c6500; border-color: transparent;">✍️ 自訂</button>`;
+        html += `<button class="cat-tab" onclick="selectQuickZonePrefix('自訂', this)" style="background-color: #fffbeb; color: #d97706; border-color: transparent;">✍️ 自訂</button>`;
         container.innerHTML = html;
     }
 
@@ -965,7 +966,7 @@
         const prefixInput = document.getElementById('quickZonePrefix'); const suffixInput = document.getElementById('quickZoneSuffix'); const zoneInput = document.getElementById('zoneInput');
         if (prefix === '自訂') {
             prefixInput.value = ''; suffixInput.value = ''; prefixInput.disabled = true; suffixInput.disabled = true;
-            zoneInput.readOnly = false; zoneInput.value = ''; zoneInput.placeholder = '手動輸入完整名稱...'; zoneInput.style.background = '#fff'; zoneInput.focus();
+            zoneInput.readOnly = false; zoneInput.value = ''; zoneInput.placeholder = '請手動輸入完整名稱...'; zoneInput.style.background = '#fff'; zoneInput.focus();
         } else {
             zoneInput.readOnly = true; zoneInput.style.background = '#eff6ff'; prefixInput.value = prefix;
             suffixInput.disabled = false; suffixInput.style.background = '#fff'; suffixInput.value = ''; suffixInput.focus();
@@ -1121,7 +1122,7 @@
         });
     }
 
-    // === 📊 總覽儀表板 (仿效期風格重構) ===
+    // === 📊 總覽儀表板 (修復回歸，套用 IKEA 4 格卡片風格) ===
     window.renderDashboard = function() {
         const container = document.getElementById('dashIssuesContainer');
         const activeZonesArray = window.sortZones([...knownZones].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
@@ -1131,7 +1132,7 @@
         let countedItems = scannedItems.filter(i => !isUncounted(i.initialQty)).length;
         
         let finishedZonesCount = 0;
-        let issuesCount = 0; // 計算異常或多次更正的數量
+        let issuesCount = 0; 
         let issuesHtml = "";
 
         let multipleCorrections = scannedItems.filter(i => i.correctionHistory && i.correctionHistory.length > 1);
@@ -1142,9 +1143,10 @@
                 const deptName = (zoneDepartments[i.zone] || 'SFM') === 'REST' ? '🍽️' : '🛒';
                 issuesHtml += `<div class="issue-card" style="border-left-color:var(--ikea-red); background:#fef2f2;">
                     <div class="issue-icon">⚠️</div>
-                    <div class="issue-content">
-                        <h4>${deptName} [${i.zone}] - ${i.name}</h4>
-                        <p style="color:var(--ikea-red);">已被更正 ${i.correctionHistory.length} 次，請優先查核！</p>
+                    <div class="issue-content" style="width: 100%;">
+                        <h4>[${deptName}超市] 📍 ${i.zone}</h4>
+                        <p style="color:var(--ikea-dark); font-weight:bold;">${i.name}</p>
+                        <p style="color:var(--ikea-red); margin-top: 4px;">已被更正 ${i.correctionHistory.length} 次，請優先查核！</p>
                     </div>
                 </div>`;
             });
@@ -1156,6 +1158,7 @@
             if (isZoneDone) {
                 finishedZonesCount++;
             } else {
+                issuesCount++;
                 const zItems = scannedItems.filter(i => i.zone === z);
                 let reason = [];
                 
@@ -1176,11 +1179,11 @@
                     if (unRandomed > 0) reason.push(`缺 ${unRandomed} 項抽盤`);
                 }
 
-                const deptName = (zoneDepartments[z] || 'SFM') === 'REST' ? '🍽️' : '🛒';
+                const deptName = (zoneDepartments[z] || 'SFM') === 'REST' ? '🍽️ 餐廳' : '🛒 超市';
                 issuesHtml += `<div class="issue-card">
                     <div class="issue-icon">📍</div>
                     <div class="issue-content">
-                        <h4>${deptName} ${z}</h4>
+                        <h4>[${deptName}] ${z}</h4>
                         <p>${reason.join("、")}</p>
                     </div>
                 </div>`;
@@ -1191,7 +1194,6 @@
         document.getElementById('dashTotalPercent').innerText = `${percent}%`;
         document.getElementById('dashProgressBar').style.width = `${percent}%`;
         
-        // 更新上方 4 個統計數字卡片
         document.getElementById('dashZoneStatsVal').innerText = finishedZonesCount;
         document.getElementById('dashItemStatsVal').innerText = countedItems;
         document.getElementById('dashIssuesVal').innerText = issuesCount;
