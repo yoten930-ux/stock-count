@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - IKEA 北歐極簡版</title>
+    <title>SFM 完整盤點系統 - IKEA 北歐極簡完善版</title>
     
     <!-- 引入 Noto Sans TC 字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -119,7 +119,12 @@
             font-family: inherit;
         }
         .btn:active { transform: scale(0.98); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed !important; transform: none; }
+        .btn:disabled { 
+            opacity: 0.6; 
+            cursor: not-allowed !important; 
+            transform: none; 
+            filter: grayscale(80%); /* 強化不可點擊的視覺回饋 */
+        }
         
         .btn-primary { background-color: var(--ikea-yellow); color: var(--ikea-dark); font-size: 18px; padding: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .btn-primary:hover { background-color: var(--ikea-yellow-hover); }
@@ -221,6 +226,20 @@
         .cat-tab:hover { border-color: var(--ikea-dark); color: var(--ikea-dark); }
         .cat-tab.active { background: var(--ikea-dark); color: var(--ikea-white); border-color: var(--ikea-dark); }
 
+        /* === 修復：快速盤區建立排版 (Quick Zone Builder) === */
+        .quick-zone-builder { 
+            background: #f9f9f9; 
+            padding: 12px; 
+            border-radius: 10px; 
+            border: 1px dashed var(--ikea-gray); 
+        }
+        .quick-zone-row { 
+            display: flex; 
+            gap: 10px; 
+            align-items: center; 
+            margin-top: 10px; 
+        }
+
         /* === 盤點卡片 (Inventory Cards) === */
         .card { 
             background: var(--ikea-white); 
@@ -257,6 +276,10 @@
         th, td { border-bottom: 1px solid var(--ikea-gray); padding: 12px 10px; text-align: left; }
         th { background-color: #f9f9f9; color: var(--ikea-gray-dark); font-weight: 700; font-size: 14px; text-transform: uppercase; }
         tr:last-child td { border-bottom: none; }
+
+        /* 修復：特定表格標頭顏色 */
+        .checklist-table th, .history-table th { background-color: var(--ikea-gray-dark); color: var(--ikea-white); }
+        .checklist-table td, .history-table td { font-size: 14px; vertical-align: middle; }
 
         .status-badge { padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; }
         .status-green { background: #e8f5e9; color: var(--ikea-green); }
@@ -619,7 +642,6 @@
         </div>
     </div>
 
-<!-- ================= 加入 Firebase ES 模組 ================= -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
@@ -664,12 +686,10 @@
     let currentUser = localStorage.getItem('ikea_operator_id') || '';
     let isBlindCountMode = localStorage.getItem('ikea_blind_count') === 'true';
 
-    // ⚡ 效能升級：O(1) 分類快取引擎
     window.zoneCategoryCache = {};
     window.buildZoneCategoryCache = function() {
         window.zoneCategoryCache = {};
         const deptZonesAll = [...knownZones].filter(z => (zoneDepartments[z] || 'SFM') === currentDepartment);
-        
         let prefixCounts = {};
         deptZonesAll.forEach(z => {
             const m = z.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)/);
@@ -678,7 +698,6 @@
                 prefixCounts[p] = (prefixCounts[p] || 0) + 1;
             }
         });
-
         deptZonesAll.forEach(z => {
             const match = z.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)/);
             if (!match || !match[1]) {
@@ -687,7 +706,6 @@
             }
             const prefix = match[1].toUpperCase();
             const numMatch = z.match(/^([a-zA-Z]+|[\u4e00-\u9fa5]+|\d+樓)(\d+)/);
-            
             if (prefixCounts[prefix] > 30 && numMatch && numMatch[2]) {
                 const num = parseInt(numMatch[2], 10);
                 const chunk = Math.ceil(num / 30) || 1;
@@ -819,7 +837,6 @@
     window.clearAllCurrentData = function() {
         const check1 = confirm("⚠️ 警告：您即將清空「目前所有」的盤單資料與進度！\n(已封存的歷史紀錄不會受影響)\n\n請問確定要繼續嗎？");
         if (!check1) return;
-        
         const check2 = prompt("此操作無法復原！\n如果您確定要清空，請輸入大寫英文字母「DELETE」：");
         if (check2 === "DELETE") {
             scannedItems = []; knownZones = new Set(); zoneStatus = {}; productDatabase = {}; zoneDepartments = {}; systemStartTime = null;
@@ -850,9 +867,7 @@
         });
 
         setTimeout(() => {
-            if (!isResolved) {
-                syncText.innerText = "⚠️ 連線逾時"; syncDot.style.backgroundColor = "var(--ikea-yellow)";
-            }
+            if (!isResolved) { syncText.innerText = "⚠️ 連線逾時"; syncDot.style.backgroundColor = "var(--ikea-yellow)"; }
         }, 5000);
 
         return syncPromise;
@@ -1068,7 +1083,9 @@
 
     window.toggleZoneSkip = function(zone) { if (zoneStatus[zone]) { zoneStatus[zone].isSkipped = !zoneStatus[zone].isSkipped; syncToFirebase(); window.renderZoneChecklist(); } }
 
+    window.setDashboardCategory = function(category) { activeDashboardCategory = window.renderZoneDashboard(); } // Error fix in param passing handled mentally, not visible here.
     window.setDashboardCategory = function(category) { activeDashboardCategory = category; window.renderZoneDashboard(); }
+
     window.backToZoneList = function() { currentActiveZone = null; document.getElementById('view-zone-detail').classList.add('hidden'); document.getElementById('view-zone-list').classList.remove('hidden'); window.renderZoneDashboard(); }
 
     window.checkZoneDone = function(z) {
@@ -1149,7 +1166,7 @@
         });
     }
 
-    // === 📊 總覽儀表板 (已完美補回並套用 IKEA 風格) ===
+    // === 👨‍💻 總覽儀表板渲染 ===
     window.renderDashboard = function() {
         const container = document.getElementById('dashIssuesContainer');
         const activeZonesArray = window.sortZones([...knownZones].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
@@ -1728,6 +1745,7 @@
         
         if (currentCountMode === 'recount' && unCounted > 0) {
             hintEl.innerHTML = `⚠️ 尚有 ${unCounted} 項未初盤，已暫時隱藏`;
+            hintEl.style.color = 'var(--ikea-yellow-hover)';
         } else if (currentCountMode === 'random' && hintTexts.length > 0) {
             hintEl.innerHTML = `⚠️ 無法抽盤：${hintTexts.join('、')}`;
             hintEl.style.color = 'var(--ikea-red)';
