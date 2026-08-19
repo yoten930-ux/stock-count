@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 效能修復與 IKEA 極簡版</title>
+    <title>SFM 完整盤點系統 - 儀表板互動篩選版</title>
     
     <!-- 引入 Noto Sans TC 字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -218,6 +218,7 @@
         th { background-color: #f8fafc; color: #475569; font-weight: 700; font-size: 13px; }
         tr:last-child td { border-bottom: none; }
 
+        /* 強制狀態與操作欄位不換行 */
         .checklist-table th:nth-child(2), .checklist-table td:nth-child(2),
         .checklist-table th:nth-child(3), .checklist-table td:nth-child(3),
         .history-table th:nth-child(5), .history-table td:nth-child(5) {
@@ -243,9 +244,20 @@
         #syncStatus { position: fixed; top: 16px; right: 16px; background: rgba(255,255,255,0.95); color: var(--ikea-dark); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; z-index: 2000; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); backdrop-filter: blur(4px);}
         .sync-dot { width: 8px; height: 8px; background: #ccc; border-radius: 50%; display: inline-block; }
 
-        /* === 儀表板特製設計 (4格數據) === */
+        /* === 儀表板特製設計 (4格數據 - 加入點擊互動) === */
         .dash-summary-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-        .stat-card { background: var(--ikea-white); padding: 16px; border-radius: 12px; border: 1px solid var(--ikea-border); text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.02);}
+        .stat-card { 
+            background: var(--ikea-white); padding: 16px; border-radius: 12px; 
+            border: 1px solid var(--ikea-border); text-align: center; 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+            cursor: pointer; /* 讓卡片可點擊 */
+            transition: all 0.2s ease;
+        }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        
+        /* 被選中的卡片樣式 */
+        .stat-card.active-filter { box-shadow: 0 0 0 3px var(--ikea-dark); transform: scale(0.98); }
+
         .stat-card.blue { background: var(--ikea-blue); color: white; border-color: var(--ikea-blue); }
         .stat-card.orange { background: #fffbeb; border-color: #fde68a; }
         .stat-card.orange .stat-num { color: #d97706; }
@@ -459,21 +471,21 @@
         <div id="tab-dashboard" class="hidden">
             <h2 class="tab-title">📊 總覽儀表板</h2>
 
-            <!-- 數據統計卡片 (對齊效期風格) -->
+            <!-- 數據統計卡片 (加入互動篩選事件) -->
             <div class="dash-summary-container">
-                <div class="stat-card blue">
+                <div class="stat-card blue" id="cardDashAll" onclick="window.setDashFilter('all')">
                     <div class="stat-num" id="dashTotalPercent">0%</div>
                     <div class="stat-label">整體完成度</div>
                 </div>
-                <div class="stat-card orange">
+                <div class="stat-card orange" id="cardDashCompleted" onclick="window.setDashFilter('completed')">
                     <div class="stat-num" id="dashZoneStatsVal">0</div>
                     <div class="stat-label">已驗收盤區</div>
                 </div>
-                <div class="stat-card red">
+                <div class="stat-card red" id="cardDashPending" onclick="window.setDashFilter('pending')">
                     <div class="stat-num" id="dashIssuesVal">0</div>
                     <div class="stat-label">異常/待處理</div>
                 </div>
-                <div class="stat-card" style="background:#f8fafc; border-color:#e2e8f0; color:#475569;">
+                <div class="stat-card" id="cardDashItems" onclick="window.setDashFilter('all')" style="background:#f8fafc; border-color:#e2e8f0; color:#475569;">
                     <div class="stat-num" id="dashItemStatsVal" style="color:#334155;">0</div>
                     <div class="stat-label">已盤商品數</div>
                 </div>
@@ -483,7 +495,8 @@
                 ⏳ 預估剩餘時間：系統計算中...
             </div>
 
-            <h3 style="color: var(--ikea-dark); font-size: 18px; margin-bottom: 12px;">⚠️ 待處理清單 (未完成)</h3>
+            <!-- 動態切換的清單標題 -->
+            <h3 id="dashIssuesTitle" style="color: var(--ikea-dark); font-size: 18px; margin-bottom: 12px;">⚠️ 待處理清單 (未完成)</h3>
             <div id="dashIssuesContainer"></div>
         </div>
 
@@ -632,6 +645,9 @@
     let activeDashboardCategory = '全部';
     let lastScanCode = ''; let lastScanTime = 0; let scanMode = 'create';
     let isFirstLoad = true;
+
+    // === 全域篩選變數 (Dashboard) ===
+    let dashFilterMode = 'pending'; // 預設顯示待處理
 
     window.isVerifying = false;
     window.verifyItemId = null;
@@ -840,7 +856,7 @@
     }
     window.updateHeaderMonth = function() { document.querySelectorAll('.display-month').forEach(el => el.innerText = currentInventoryMonth); }
 
-    // === 🔙 修復：返回按鈕動態顯示邏輯 ===
+    // === 返回按鈕動態顯示邏輯 ===
     window.goBack = function() {
         if (!document.getElementById('view-zone-detail').classList.contains('hidden')) {
             window.backToZoneList();
@@ -1155,7 +1171,13 @@
         });
     }
 
-    // === 👨‍💻 徹底修復：移除會造成系統崩潰的進度條，完美連接 4 格卡片 ===
+    // === 👆 動態切換儀表板過濾器 ===
+    window.setDashFilter = function(mode) {
+        dashFilterMode = mode;
+        window.renderDashboard();
+    }
+
+    // === 📊 總覽儀表板 (支援互動篩選) ===
     window.renderDashboard = function() {
         const container = document.getElementById('dashIssuesContainer');
         const activeZonesArray = window.sortZones([...knownZones].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
@@ -1166,15 +1188,19 @@
         
         let finishedZonesCount = 0;
         let issuesCount = 0; 
-        let issuesHtml = "";
+
+        // 建立三個分類的 HTML 字串暫存
+        let pendingHtml = "";
+        let completedHtml = "";
+        let allHtml = "";
 
         let multipleCorrections = scannedItems.filter(i => i.correctionHistory && i.correctionHistory.length > 1);
         if (multipleCorrections.length > 0) {
-            issuesHtml += `<h4 style="color:var(--ikea-red); margin-top:8px; border-bottom:1px solid #fecaca; padding-bottom:8px;">🚨 特別注意：多次更正商品</h4>`;
+            let warnHtml = `<h4 style="color:var(--ikea-red); margin-top:8px; border-bottom:1px solid #fecaca; padding-bottom:8px;">🚨 特別注意：多次更正商品</h4>`;
             multipleCorrections.forEach(i => {
                 issuesCount++;
                 const deptName = (zoneDepartments[i.zone] || 'SFM') === 'REST' ? '🍽️' : '🛒';
-                issuesHtml += `<div class="issue-card" style="border-left-color:var(--ikea-red); background:#fef2f2;">
+                warnHtml += `<div class="issue-card" style="border-left-color:var(--ikea-red); background:#fef2f2;">
                     <div class="issue-icon">⚠️</div>
                     <div class="issue-content" style="width: 100%;">
                         <h4>[${deptName}超市] 📍 ${i.zone}</h4>
@@ -1183,13 +1209,27 @@
                     </div>
                 </div>`;
             });
-            issuesHtml += `<h4 style="color:var(--ikea-dark); margin-top:24px; border-bottom:1px solid var(--ikea-border); padding-bottom:8px;">⚠️ 待處理盤區</h4>`;
+            warnHtml += `<h4 style="color:var(--ikea-dark); margin-top:24px; border-bottom:1px solid var(--ikea-border); padding-bottom:8px;">⚠️ 待處理盤區</h4>`;
+            
+            pendingHtml += warnHtml;
+            allHtml += warnHtml;
         }
 
         activeZonesArray.forEach(z => {
             const isZoneDone = window.checkZoneDone(z);
+            const deptName = (zoneDepartments[z] || 'SFM') === 'REST' ? '🍽️ 餐廳' : '🛒 超市';
+
             if (isZoneDone) {
                 finishedZonesCount++;
+                let cardHtml = `<div class="issue-card" style="border-left-color:var(--ikea-green); background:#eff6ff;">
+                    <div class="issue-icon">✅</div>
+                    <div class="issue-content">
+                        <h4>[${deptName}] ${z}</h4>
+                        <p style="color:var(--ikea-green); font-weight:bold;">已完成驗收</p>
+                    </div>
+                </div>`;
+                completedHtml += cardHtml;
+                allHtml += cardHtml;
             } else {
                 issuesCount++;
                 const zItems = scannedItems.filter(i => i.zone === z);
@@ -1212,25 +1252,26 @@
                     if (unRandomed > 0) reason.push(`缺 ${unRandomed} 項抽盤`);
                 }
 
-                const deptName = (zoneDepartments[z] || 'SFM') === 'REST' ? '🍽️ 餐廳' : '🛒 超市';
-                issuesHtml += `<div class="issue-card">
+                let cardHtml = `<div class="issue-card">
                     <div class="issue-icon">📍</div>
                     <div class="issue-content">
                         <h4>[${deptName}] ${z}</h4>
                         <p>${reason.join("、")}</p>
                     </div>
                 </div>`;
+                pendingHtml += cardHtml;
+                allHtml += cardHtml;
             }
         });
 
+        // 更新上方 4 個統計數字卡片
         const percent = activeZonesArray.length > 0 ? Math.round((finishedZonesCount / activeZonesArray.length) * 100) : 0;
-        
-        // 精準填入全新的四格數據卡片，移除了會導致當機的 dashProgressBar
         document.getElementById('dashTotalPercent').innerText = `${percent}%`;
         document.getElementById('dashZoneStatsVal').innerText = finishedZonesCount;
         document.getElementById('dashItemStatsVal').innerText = countedItems;
         document.getElementById('dashIssuesVal').innerText = issuesCount;
 
+        // 計算 ETA
         let etaHtml = "";
         let remainingItemsToCount = totalItems - countedItems;
         if (systemStartTime && countedItems > 0 && finishedZonesCount < activeZonesArray.length) {
@@ -1247,11 +1288,26 @@
         }
         document.getElementById('dashETA').innerText = etaHtml;
 
-        if (issuesHtml === "") {
-            container.innerHTML = "<div style='text-align:center; color:var(--ikea-green); background:#eff6ff; padding:24px; border-radius:12px; font-weight:700; border: 1px solid #dbeafe;'>🏆 恭喜！全館盤區皆已嚴謹驗收完成，可準備結算匯出！</div>";
-        } else {
-            container.innerHTML = issuesHtml;
+        // 依據選擇的狀態套用 Active 樣式
+        document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active-filter'));
+        if(dashFilterMode === 'all') {
+            document.getElementById('cardDashAll').classList.add('active-filter');
+            document.getElementById('dashIssuesTitle').innerText = '📋 全館盤區狀態總覽';
+        } else if(dashFilterMode === 'completed') {
+            document.getElementById('cardDashCompleted').classList.add('active-filter');
+            document.getElementById('dashIssuesTitle').innerText = '✅ 已驗收盤區清單';
+        } else { // pending
+            document.getElementById('cardDashPending').classList.add('active-filter');
+            document.getElementById('dashIssuesTitle').innerText = '⚠️ 待處理清單 (未完成)';
         }
+
+        // 決定要渲染進畫面的 HTML
+        let finalHtml = "";
+        if (dashFilterMode === 'all') finalHtml = allHtml || "<p style='text-align:center; color:#94a3b8; padding: 20px;'>目前尚無任何資料。</p>";
+        else if (dashFilterMode === 'completed') finalHtml = completedHtml || "<p style='text-align:center; color:#94a3b8; padding: 20px;'>目前尚無已驗收完成的盤區。</p>";
+        else finalHtml = pendingHtml || "<div style='text-align:center; color:var(--ikea-green); background:#eff6ff; padding:24px; border-radius:12px; font-weight:700; border: 1px solid #dbeafe;'>🏆 恭喜！全館盤區皆已嚴謹驗收完成！</div>";
+
+        document.getElementById('dashIssuesContainer').innerHTML = finalHtml;
     }
 
     window.exportToExcel = function() {
