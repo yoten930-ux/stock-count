@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - IKEA 極簡效能修復版</title>
+    <title>SFM 完整盤點系統 - 批次刪除與防呆修復版</title>
     
     <!-- 引入 Noto Sans TC 字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -87,7 +87,7 @@
             letter-spacing: 0.5px;
         }
 
-        /* === 底部導覽列 (Bottom Navbar) === */
+        /* === 底部導覽列 === */
         .navbar { 
             position: fixed; 
             bottom: 0; 
@@ -121,7 +121,7 @@
             background-color: var(--ikea-blue); border-radius: 2px; margin-top: 2px;
         }
 
-        /* === 按鈕設計 (Buttons) === */
+        /* === 按鈕設計 === */
         .btn { 
             width: 100%; padding: 14px; border: none; border-radius: 8px; 
             cursor: pointer; font-weight: 700; font-size: 16px; margin-bottom: 12px; 
@@ -141,7 +141,7 @@
         .btn-danger:hover { background-color: #fef2f2; }
         .btn-blue { background-color: var(--ikea-blue); color: var(--ikea-white); }
 
-        /* === 區塊容器 (Cards & Inputs) === */
+        /* === 區塊容器 === */
         .input-group { 
             background: var(--ikea-white); 
             padding: 20px; 
@@ -211,15 +211,17 @@
         .zone-badge.complete { background: #eff6ff; color: #16a34a; font-weight: 700; }
         .zone-badge.pending { background: #fffbeb; color: #d97706; font-weight: 700; }
 
-        /* === 表格設計 === */
+        /* === 表格設計 (解決換行問題) === */
         .table-wrapper { width: 100%; overflow-x: auto; }
         table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; background: var(--ikea-white); border-radius: 8px; border: 1px solid var(--ikea-border); }
         th, td { border-bottom: 1px solid var(--ikea-border); padding: 12px 10px; text-align: left; }
         th { background-color: #f8fafc; color: #475569; font-weight: 700; font-size: 13px; }
         tr:last-child td { border-bottom: none; }
 
-        .checklist-table th:nth-child(2), .checklist-table td:nth-child(2),
+        /* 針對有核取方塊的表格，修改寬度強制不換行 */
+        .checklist-table th:nth-child(1), .checklist-table td:nth-child(1) { width: 40px; text-align: center; }
         .checklist-table th:nth-child(3), .checklist-table td:nth-child(3),
+        .checklist-table th:nth-child(4), .checklist-table td:nth-child(4),
         .history-table th:nth-child(5), .history-table td:nth-child(5) {
             white-space: nowrap; width: 1%;
         }
@@ -272,7 +274,6 @@
 </head>
 <body>
 
-    <!-- 右上角雲端狀態 -->
     <div id="syncStatus">
         <span class="sync-dot"></span> <span id="syncText">系統初始化中...</span>
     </div>
@@ -402,7 +403,10 @@
             </div>
 
             <div class="input-group" style="margin-top: 24px; padding-top: 24px; border-top: 2px dashed var(--ikea-border); border-radius: 0; border-left: none; border-right: none; border-bottom: none; box-shadow: none; background: transparent;">
-                <label>📋 第四步：本部門遺漏檢查清單</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <label style="margin:0;">📋 第四步：本部門盤區清單</label>
+                    <button class="btn btn-danger" style="width:auto; padding:6px 12px; margin:0; font-size:13px; border-radius:6px;" onclick="window.bulkDeleteZones()">🗑️ 批次刪除選取</button>
+                </div>
                 <div id="checklistTabsContainer" class="category-tabs"></div>
                 <div id="checklistOverallStatus"></div>
                 <div class="table-wrapper" id="zoneChecklistContainer"></div>
@@ -427,7 +431,7 @@
             <div id="view-zone-detail" class="hidden">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <h2 class="tab-title" id="currentZoneTitle" style="margin: 0; flex: 1; text-align: left;">盤區名稱</h2>
-                    <!-- 新增刪除盤區按鈕 -->
+                    <!-- 刪除盤區按鈕 -->
                     <button class="btn btn-danger" style="width: auto; margin: 0; padding: 6px 12px; font-size: 13px; border-radius: 20px;" onclick="deleteCurrentZone()">🗑️ 刪除盤區</button>
                 </div>
                 
@@ -907,15 +911,16 @@
     // === 🗑️ 新增：刪除目前盤區功能 ===
     window.deleteCurrentZone = function() {
         if (!currentActiveZone) return;
+        const zoneToDelete = currentActiveZone; // 先存起來，避免切換畫面後丟失
         
-        if (confirm(`⚠️ 警告：確定要刪除整個盤區「${currentActiveZone}」嗎？\n裡面的所有商品資料也將一併被清空，此操作無法復原！`)) {
+        if (confirm(`⚠️ 警告：確定要刪除整個盤區「${zoneToDelete}」嗎？\n裡面的所有商品資料也將一併被清空，此操作無法復原！`)) {
             // 1. 過濾掉該盤區的商品
-            scannedItems = scannedItems.filter(item => item.zone !== currentActiveZone);
+            scannedItems = scannedItems.filter(item => item.zone !== zoneToDelete);
             
             // 2. 移除盤區紀錄與狀態
-            knownZones.delete(currentActiveZone);
-            delete zoneStatus[currentActiveZone];
-            delete zoneDepartments[currentActiveZone];
+            knownZones.delete(zoneToDelete);
+            delete zoneStatus[zoneToDelete];
+            delete zoneDepartments[zoneToDelete];
             
             // 3. 重新計算快取並同步雲端
             window.buildZoneCategoryCache();
@@ -927,7 +932,41 @@
             window.renderCreateListTable();
             window.renderQuickZoneButtons();
             
-            alert(`✅ 盤區「${currentActiveZone}」已成功刪除！`);
+            alert(`✅ 盤區「${zoneToDelete}」已成功刪除！`);
+        }
+    }
+
+    // === 🗑️ 新增：批次刪除選取盤區功能 ===
+    window.toggleAllZones = function(source) {
+        const checkboxes = document.querySelectorAll('.zone-checkbox');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+    }
+
+    window.bulkDeleteZones = function() {
+        const checkboxes = document.querySelectorAll('.zone-checkbox:checked');
+        if (checkboxes.length === 0) {
+            alert("請先勾選要刪除的盤區！");
+            return;
+        }
+        
+        const zonesToDelete = Array.from(checkboxes).map(cb => cb.value);
+        if (confirm(`⚠️ 警告：確定要刪除選取的 ${zonesToDelete.length} 個盤區嗎？\n裡面的所有商品資料也將一併被清空，此操作無法復原！`)) {
+            zonesToDelete.forEach(zone => {
+                scannedItems = scannedItems.filter(item => item.zone !== zone);
+                knownZones.delete(zone);
+                delete zoneStatus[zone];
+                delete zoneDepartments[zone];
+            });
+            
+            window.buildZoneCategoryCache();
+            syncToFirebase();
+            
+            window.renderZoneChecklist();
+            window.renderCreateListTable();
+            window.renderQuickZoneButtons();
+            window.renderZoneDashboard();
+            
+            alert(`✅ 成功刪除 ${zonesToDelete.length} 個盤區！`);
         }
     }
 
@@ -1098,7 +1137,8 @@
         let filteredZones = activeChecklistCategory !== '全部' ? zonesArray.filter(z => window.getZoneCategory(z) === activeChecklistCategory) : zonesArray;
         if (filteredZones.length === 0) { container.innerHTML = `<p style='text-align:center; color:#94a3b8; padding: 20px;'>此分類下無盤區。</p>`; return; }
 
-        let html = '<div class="table-wrapper"><table class="checklist-table"><thead><tr><th>盤區名稱</th><th>目前狀態</th><th>操作</th></tr></thead><tbody>';
+        // 加入 Checkbox 在標頭與每一列
+        let html = '<div class="table-wrapper"><table class="checklist-table"><thead><tr><th style="width:40px; text-align:center;"><input type="checkbox" id="selectAllZones" style="width:18px; height:18px; accent-color:var(--ikea-blue); cursor:pointer;" onclick="window.toggleAllZones(this)"></th><th>盤區名稱</th><th>目前狀態</th><th>操作</th></tr></thead><tbody>';
         filteredZones.forEach(zone => {
             if (!zoneStatus[zone]) zoneStatus[zone] = { isSkipped: false, sign_zoneInitial: null, sign_zoneRecount: null, sign_zoneRandom: null };
             const hasItems = scannedItems.some(item => item.zone === zone);
@@ -1106,7 +1146,8 @@
             if (hasItems) { statusBadge = '<span class="status-badge status-green">🟢 已加商品</span>'; actionBtn = '<span style="color:#cbd5e1; font-size:12px;">(正常)</span>'; zoneStatus[zone].isSkipped = false; } 
             else if (zoneStatus[zone].isSkipped) { statusBadge = '<span class="status-badge status-grey">⚪ 不盤點</span>'; actionBtn = `<button class="btn btn-outline" style="padding:4px 12px; font-size:12px; margin:0;" onclick="window.toggleZoneSkip('${zone}')">恢復</button>`; } 
             else { statusBadge = '<span class="status-badge status-red">🔴 空盤區</span>'; actionBtn = `<button class="btn" style="background:#f1f5f9; border: 1px solid #cbd5e1; padding:4px 12px; font-size:12px; margin:0; color:#475569;" onclick="window.toggleZoneSkip('${zone}')">設為不盤</button>`; }
-            html += `<tr><td style="font-weight:700; color:var(--ikea-blue); cursor:pointer;" onclick="window.jumpToZone('${zone}')">${zone}</td><td>${statusBadge}</td><td>${actionBtn}</td></tr>`;
+            
+            html += `<tr><td style="text-align:center;"><input type="checkbox" class="zone-checkbox" value="${zone}" style="width:18px; height:18px; accent-color:var(--ikea-blue); margin:0; cursor:pointer;"></td><td style="font-weight:700; color:var(--ikea-blue); cursor:pointer;" onclick="window.jumpToZone('${zone}')">${zone}</td><td>${statusBadge}</td><td>${actionBtn}</td></tr>`;
         });
         html += '</tbody></table></div>'; container.innerHTML = html;
         savePersistedDataLocalOnly(); 
@@ -1534,6 +1575,9 @@
             let msg = `✅ Excel 匯入成功！\n- 盤區已加入【${currentDepartment === 'REST' ? 'IKEA 餐廳' : '超市與美食'}】。`;
             if (shouldImportItems) msg += `\n- 載入了 ${importedItemsCount} 項預設商品。`; alert(msg);
             if(!document.getElementById('tab-create').classList.contains('hidden')) { window.renderZoneChecklist(); window.renderCreateListTable(); }
+            
+            // 恢復防呆：上傳後重置檔案，讓使用者可以再次選擇同一個檔案
+            event.target.value = '';
         };
         reader.readAsArrayBuffer(file);
     }
@@ -2055,7 +2099,7 @@
             window.applySignature(savedSig);
             window.closeSignaturePad();
         } else {
-            alert("找不到預設簽名，請先手提簽名並儲存！");
+            alert("找不到預設簽名，請先手動簽名並儲存！");
         }
     }
     
