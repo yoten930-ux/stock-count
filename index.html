@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 批次刪除與防呆修復版</title>
+    <title>SFM 完整盤點系統 - 狀態記憶與動態按鈕版</title>
     
     <!-- 引入 Noto Sans TC 字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -87,7 +87,7 @@
             letter-spacing: 0.5px;
         }
 
-        /* === 底部導覽列 === */
+        /* === 底部導覽列 (Bottom Navbar) === */
         .navbar { 
             position: fixed; 
             bottom: 0; 
@@ -121,7 +121,7 @@
             background-color: var(--ikea-blue); border-radius: 2px; margin-top: 2px;
         }
 
-        /* === 按鈕設計 === */
+        /* === 按鈕設計 (Buttons) === */
         .btn { 
             width: 100%; padding: 14px; border: none; border-radius: 8px; 
             cursor: pointer; font-weight: 700; font-size: 16px; margin-bottom: 12px; 
@@ -141,7 +141,7 @@
         .btn-danger:hover { background-color: #fef2f2; }
         .btn-blue { background-color: var(--ikea-blue); color: var(--ikea-white); }
 
-        /* === 區塊容器 === */
+        /* === 區塊容器 (Cards & Inputs) === */
         .input-group { 
             background: var(--ikea-white); 
             padding: 20px; 
@@ -211,17 +211,15 @@
         .zone-badge.complete { background: #eff6ff; color: #16a34a; font-weight: 700; }
         .zone-badge.pending { background: #fffbeb; color: #d97706; font-weight: 700; }
 
-        /* === 表格設計 (解決換行問題) === */
+        /* === 表格設計 === */
         .table-wrapper { width: 100%; overflow-x: auto; }
         table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; background: var(--ikea-white); border-radius: 8px; border: 1px solid var(--ikea-border); }
         th, td { border-bottom: 1px solid var(--ikea-border); padding: 12px 10px; text-align: left; }
         th { background-color: #f8fafc; color: #475569; font-weight: 700; font-size: 13px; }
         tr:last-child td { border-bottom: none; }
 
-        /* 針對有核取方塊的表格，修改寬度強制不換行 */
-        .checklist-table th:nth-child(1), .checklist-table td:nth-child(1) { width: 40px; text-align: center; }
+        .checklist-table th:nth-child(2), .checklist-table td:nth-child(2),
         .checklist-table th:nth-child(3), .checklist-table td:nth-child(3),
-        .checklist-table th:nth-child(4), .checklist-table td:nth-child(4),
         .history-table th:nth-child(5), .history-table td:nth-child(5) {
             white-space: nowrap; width: 1%;
         }
@@ -274,6 +272,7 @@
 </head>
 <body>
 
+    <!-- 右上角雲端狀態 -->
     <div id="syncStatus">
         <span class="sync-dot"></span> <span id="syncText">系統初始化中...</span>
     </div>
@@ -405,7 +404,7 @@
             <div class="input-group" style="margin-top: 24px; padding-top: 24px; border-top: 2px dashed var(--ikea-border); border-radius: 0; border-left: none; border-right: none; border-bottom: none; box-shadow: none; background: transparent;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <label style="margin:0;">📋 第四步：本部門盤區清單</label>
-                    <button class="btn btn-danger" style="width:auto; padding:6px 12px; margin:0; font-size:13px; border-radius:6px;" onclick="window.bulkDeleteZones()">🗑️ 批次刪除選取</button>
+                    <button id="btnBulkDelete" class="btn btn-danger" style="width:auto; padding:6px 12px; margin:0; font-size:13px; border-radius:6px;" onclick="window.bulkDeleteZones()" disabled>🗑️ 批次刪除選取</button>
                 </div>
                 <div id="checklistTabsContainer" class="category-tabs"></div>
                 <div id="checklistOverallStatus"></div>
@@ -431,7 +430,7 @@
             <div id="view-zone-detail" class="hidden">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <h2 class="tab-title" id="currentZoneTitle" style="margin: 0; flex: 1; text-align: left;">盤區名稱</h2>
-                    <!-- 刪除盤區按鈕 -->
+                    <!-- 單一刪除盤區按鈕保留 -->
                     <button class="btn btn-danger" style="width: auto; margin: 0; padding: 6px 12px; font-size: 13px; border-radius: 20px;" onclick="deleteCurrentZone()">🗑️ 刪除盤區</button>
                 </div>
                 
@@ -658,6 +657,9 @@
 
     let currentUser = localStorage.getItem('ikea_operator_id') || '';
     let isBlindCountMode = localStorage.getItem('ikea_blind_count') === 'true';
+
+    // === 🧠 新增：狀態記憶體 (防 DOM 重繪遺失) ===
+    let selectedZonesForDelete = new Set();
 
     window.zoneCategoryCache = {};
     window.buildZoneCategoryCache = function() {
@@ -890,6 +892,11 @@
                 btn.classList.toggle('active', btn.dataset.dept === dept); 
             }
         });
+        
+        // 切換部門時，防呆清空已勾選狀態
+        selectedZonesForDelete.clear();
+        window.updateBulkDeleteButton();
+        
         window.buildZoneCategoryCache(); 
         window.renderQuickZoneButtons(); 
         window.renderZoneChecklist(); 
@@ -908,25 +915,19 @@
         if(navigator.vibrate) navigator.vibrate([100]); 
     }
 
-    // === 🗑️ 新增：刪除目前盤區功能 ===
     window.deleteCurrentZone = function() {
         if (!currentActiveZone) return;
-        const zoneToDelete = currentActiveZone; // 先存起來，避免切換畫面後丟失
+        const zoneToDelete = currentActiveZone; 
         
         if (confirm(`⚠️ 警告：確定要刪除整個盤區「${zoneToDelete}」嗎？\n裡面的所有商品資料也將一併被清空，此操作無法復原！`)) {
-            // 1. 過濾掉該盤區的商品
             scannedItems = scannedItems.filter(item => item.zone !== zoneToDelete);
-            
-            // 2. 移除盤區紀錄與狀態
             knownZones.delete(zoneToDelete);
             delete zoneStatus[zoneToDelete];
             delete zoneDepartments[zoneToDelete];
             
-            // 3. 重新計算快取並同步雲端
             window.buildZoneCategoryCache();
             syncToFirebase();
             
-            // 4. 退回列表並重新渲染相關畫面
             window.backToZoneList();
             window.renderZoneChecklist();
             window.renderCreateListTable();
@@ -936,20 +937,41 @@
         }
     }
 
-    // === 🗑️ 新增：批次刪除選取盤區功能 ===
+    // === 🗑️ 新增：獨立狀態的批次刪除邏輯 ===
+    window.toggleZoneSelection = function(zone, isChecked) {
+        if (isChecked) {
+            selectedZonesForDelete.add(zone);
+        } else {
+            selectedZonesForDelete.delete(zone);
+        }
+        window.updateBulkDeleteButton();
+    }
+
     window.toggleAllZones = function(source) {
         const checkboxes = document.querySelectorAll('.zone-checkbox');
-        checkboxes.forEach(cb => cb.checked = source.checked);
+        checkboxes.forEach(cb => { 
+            cb.checked = source.checked; 
+            window.toggleZoneSelection(cb.value, source.checked);
+        });
+    }
+
+    window.updateBulkDeleteButton = function() {
+        const btn = document.getElementById('btnBulkDelete');
+        if(!btn) return;
+        const count = selectedZonesForDelete.size;
+        if (count > 0) {
+            btn.innerHTML = `🗑️ 刪除已選取的 ${count} 個盤區`;
+            btn.disabled = false;
+        } else {
+            btn.innerHTML = `🗑️ 批次刪除選取`;
+            btn.disabled = true;
+        }
     }
 
     window.bulkDeleteZones = function() {
-        const checkboxes = document.querySelectorAll('.zone-checkbox:checked');
-        if (checkboxes.length === 0) {
-            alert("請先勾選要刪除的盤區！");
-            return;
-        }
+        if (selectedZonesForDelete.size === 0) return;
         
-        const zonesToDelete = Array.from(checkboxes).map(cb => cb.value);
+        const zonesToDelete = [...selectedZonesForDelete];
         if (confirm(`⚠️ 警告：確定要刪除選取的 ${zonesToDelete.length} 個盤區嗎？\n裡面的所有商品資料也將一併被清空，此操作無法復原！`)) {
             zonesToDelete.forEach(zone => {
                 scannedItems = scannedItems.filter(item => item.zone !== zone);
@@ -958,6 +980,8 @@
                 delete zoneDepartments[zone];
             });
             
+            selectedZonesForDelete.clear();
+            window.updateBulkDeleteButton();
             window.buildZoneCategoryCache();
             syncToFirebase();
             
@@ -1137,7 +1161,7 @@
         let filteredZones = activeChecklistCategory !== '全部' ? zonesArray.filter(z => window.getZoneCategory(z) === activeChecklistCategory) : zonesArray;
         if (filteredZones.length === 0) { container.innerHTML = `<p style='text-align:center; color:#94a3b8; padding: 20px;'>此分類下無盤區。</p>`; return; }
 
-        // 加入 Checkbox 在標頭與每一列
+        // 綁定獨立的 Set 狀態，確保重新渲染時勾選不遺失
         let html = '<div class="table-wrapper"><table class="checklist-table"><thead><tr><th style="width:40px; text-align:center;"><input type="checkbox" id="selectAllZones" style="width:18px; height:18px; accent-color:var(--ikea-blue); cursor:pointer;" onclick="window.toggleAllZones(this)"></th><th>盤區名稱</th><th>目前狀態</th><th>操作</th></tr></thead><tbody>';
         filteredZones.forEach(zone => {
             if (!zoneStatus[zone]) zoneStatus[zone] = { isSkipped: false, sign_zoneInitial: null, sign_zoneRecount: null, sign_zoneRandom: null };
@@ -1147,10 +1171,12 @@
             else if (zoneStatus[zone].isSkipped) { statusBadge = '<span class="status-badge status-grey">⚪ 不盤點</span>'; actionBtn = `<button class="btn btn-outline" style="padding:4px 12px; font-size:12px; margin:0;" onclick="window.toggleZoneSkip('${zone}')">恢復</button>`; } 
             else { statusBadge = '<span class="status-badge status-red">🔴 空盤區</span>'; actionBtn = `<button class="btn" style="background:#f1f5f9; border: 1px solid #cbd5e1; padding:4px 12px; font-size:12px; margin:0; color:#475569;" onclick="window.toggleZoneSkip('${zone}')">設為不盤</button>`; }
             
-            html += `<tr><td style="text-align:center;"><input type="checkbox" class="zone-checkbox" value="${zone}" style="width:18px; height:18px; accent-color:var(--ikea-blue); margin:0; cursor:pointer;"></td><td style="font-weight:700; color:var(--ikea-blue); cursor:pointer;" onclick="window.jumpToZone('${zone}')">${zone}</td><td>${statusBadge}</td><td>${actionBtn}</td></tr>`;
+            let isChecked = selectedZonesForDelete.has(zone) ? 'checked' : '';
+            html += `<tr><td style="text-align:center;"><input type="checkbox" class="zone-checkbox" value="${zone}" ${isChecked} onchange="window.toggleZoneSelection('${zone}', this.checked)" style="width:18px; height:18px; accent-color:var(--ikea-blue); margin:0; cursor:pointer;"></td><td style="font-weight:700; color:var(--ikea-blue); cursor:pointer;" onclick="window.jumpToZone('${zone}')">${zone}</td><td>${statusBadge}</td><td>${actionBtn}</td></tr>`;
         });
         html += '</tbody></table></div>'; container.innerHTML = html;
         savePersistedDataLocalOnly(); 
+        window.updateBulkDeleteButton();
     }
 
     window.toggleZoneSkip = function(zone) { if (zoneStatus[zone]) { zoneStatus[zone].isSkipped = !zoneStatus[zone].isSkipped; syncToFirebase(); window.renderZoneChecklist(); } }
@@ -1178,40 +1204,6 @@
             return true;
         }
         return false;
-    }
-
-    window.updateModeUI = function() {
-        if (!currentActiveZone) return;
-        const zoneItems = scannedItems.filter(i => i.zone === currentActiveZone);
-        const isUncounted = (val) => val === null || val === undefined || val === "";
-        const unCounted = zoneItems.filter(i => isUncounted(i.initialQty)).length;
-        const unRecounted = zoneItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
-        
-        const btnRandom = document.getElementById('btnModeRandom');
-        const hintEl = document.getElementById('modeStatusHint');
-        let hintTexts = [];
-        
-        if (unCounted > 0 || unRecounted > 0) {
-            btnRandom.disabled = true;
-            if (unCounted > 0) hintTexts.push(`缺 ${unCounted} 初盤`);
-            if (unRecounted > 0) hintTexts.push(`缺 ${unRecounted} 覆核`);
-        } else {
-            btnRandom.disabled = false;
-        }
-        
-        if (currentCountMode === 'recount' && unCounted > 0) {
-            hintEl.innerHTML = `⚠️ 尚有 ${unCounted} 項未初盤，暫不顯示`;
-            hintEl.style.color = '#d97706';
-        } else if (currentCountMode === 'random' && hintTexts.length > 0) {
-            hintEl.innerHTML = `⚠️ 無法抽盤：${hintTexts.join('、')}`;
-            hintEl.style.color = 'var(--ikea-red)';
-        } else if (hintTexts.length > 0) {
-            hintEl.innerHTML = `📌 抽盤鎖定中：${hintTexts.join('、')}`;
-            hintEl.style.color = 'var(--ikea-gray-dark)';
-        } else {
-            hintEl.innerHTML = `✅ 覆核完成，可進行抽盤。`;
-            hintEl.style.color = 'var(--ikea-green)';
-        }
     }
 
     window.renderZoneDashboard = function() {
@@ -1576,7 +1568,6 @@
             if (shouldImportItems) msg += `\n- 載入了 ${importedItemsCount} 項預設商品。`; alert(msg);
             if(!document.getElementById('tab-create').classList.contains('hidden')) { window.renderZoneChecklist(); window.renderCreateListTable(); }
             
-            // 恢復防呆：上傳後重置檔案，讓使用者可以再次選擇同一個檔案
             event.target.value = '';
         };
         reader.readAsArrayBuffer(file);
