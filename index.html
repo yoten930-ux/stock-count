@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 狀態記憶與動態按鈕版</title>
+    <title>SFM 完整盤點系統 - 智慧分流與壓縮防爆版</title>
     
     <!-- 引入 Noto Sans TC 字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -218,8 +218,9 @@
         th { background-color: #f8fafc; color: #475569; font-weight: 700; font-size: 13px; }
         tr:last-child td { border-bottom: none; }
 
-        .checklist-table th:nth-child(2), .checklist-table td:nth-child(2),
+        .checklist-table th:nth-child(1), .checklist-table td:nth-child(1) { width: 40px; text-align: center; }
         .checklist-table th:nth-child(3), .checklist-table td:nth-child(3),
+        .checklist-table th:nth-child(4), .checklist-table td:nth-child(4),
         .history-table th:nth-child(5), .history-table td:nth-child(5) {
             white-space: nowrap; width: 1%;
         }
@@ -237,7 +238,7 @@
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
         .modal-container { background: var(--ikea-white); padding: 24px; border-radius: 16px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
         
-        canvas { border: 2px dashed #cbd5e1; width: 100%; height: 200px; touch-action: none; background: #f8fafc; border-radius: 8px; }
+        canvas { border: 2px dashed #cbd5e1; width: 100%; height: 200px; touch-action: none; background: #ffffff; border-radius: 8px; }
         .sig-preview { max-width: 100%; height: 60px; border: 1px solid var(--ikea-border); margin-top: 10px; background: #fff; object-fit: contain; border-radius: 6px; }
 
         #syncStatus { position: fixed; top: 16px; right: 16px; background: rgba(255,255,255,0.95); color: var(--ikea-dark); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; z-index: 2000; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); backdrop-filter: blur(4px);}
@@ -430,7 +431,6 @@
             <div id="view-zone-detail" class="hidden">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <h2 class="tab-title" id="currentZoneTitle" style="margin: 0; flex: 1; text-align: left;">盤區名稱</h2>
-                    <!-- 單一刪除盤區按鈕保留 -->
                     <button class="btn btn-danger" style="width: auto; margin: 0; padding: 6px 12px; font-size: 13px; border-radius: 20px;" onclick="deleteCurrentZone()">🗑️ 刪除盤區</button>
                 </div>
                 
@@ -657,8 +657,6 @@
 
     let currentUser = localStorage.getItem('ikea_operator_id') || '';
     let isBlindCountMode = localStorage.getItem('ikea_blind_count') === 'true';
-
-    // === 🧠 新增：狀態記憶體 (防 DOM 重繪遺失) ===
     let selectedZonesForDelete = new Set();
 
     window.zoneCategoryCache = {};
@@ -779,13 +777,17 @@
     }
 
     function savePersistedDataLocalOnly() {
-        localStorage.setItem('inventory_month', currentInventoryMonth);
-        localStorage.setItem('inventory_deptMap', JSON.stringify(zoneDepartments));
-        localStorage.setItem('inventory_db', JSON.stringify(productDatabase));
-        localStorage.setItem('inventory_zones', JSON.stringify([...knownZones]));
-        localStorage.setItem('inventory_items', JSON.stringify(scannedItems));
-        localStorage.setItem('inventory_zoneStatus', JSON.stringify(zoneStatus));
-        if (systemStartTime) localStorage.setItem('inventory_start', systemStartTime);
+        try {
+            localStorage.setItem('inventory_month', currentInventoryMonth);
+            localStorage.setItem('inventory_deptMap', JSON.stringify(zoneDepartments));
+            localStorage.setItem('inventory_db', JSON.stringify(productDatabase));
+            localStorage.setItem('inventory_zones', JSON.stringify([...knownZones]));
+            localStorage.setItem('inventory_items', JSON.stringify(scannedItems));
+            localStorage.setItem('inventory_zoneStatus', JSON.stringify(zoneStatus));
+            if (systemStartTime) localStorage.setItem('inventory_start', systemStartTime);
+        } catch (e) {
+            console.error("Local storage quota exceeded or failed", e);
+        }
     }
 
     function loadPersistedDataLocalOnly() {
@@ -893,7 +895,6 @@
             }
         });
         
-        // 切換部門時，防呆清空已勾選狀態
         selectedZonesForDelete.clear();
         window.updateBulkDeleteButton();
         
@@ -937,7 +938,6 @@
         }
     }
 
-    // === 🗑️ 新增：獨立狀態的批次刪除邏輯 ===
     window.toggleZoneSelection = function(zone, isChecked) {
         if (isChecked) {
             selectedZonesForDelete.add(zone);
@@ -1161,7 +1161,6 @@
         let filteredZones = activeChecklistCategory !== '全部' ? zonesArray.filter(z => window.getZoneCategory(z) === activeChecklistCategory) : zonesArray;
         if (filteredZones.length === 0) { container.innerHTML = `<p style='text-align:center; color:#94a3b8; padding: 20px;'>此分類下無盤區。</p>`; return; }
 
-        // 綁定獨立的 Set 狀態，確保重新渲染時勾選不遺失
         let html = '<div class="table-wrapper"><table class="checklist-table"><thead><tr><th style="width:40px; text-align:center;"><input type="checkbox" id="selectAllZones" style="width:18px; height:18px; accent-color:var(--ikea-blue); cursor:pointer;" onclick="window.toggleAllZones(this)"></th><th>盤區名稱</th><th>目前狀態</th><th>操作</th></tr></thead><tbody>';
         filteredZones.forEach(zone => {
             if (!zoneStatus[zone]) zoneStatus[zone] = { isSkipped: false, sign_zoneInitial: null, sign_zoneRecount: null, sign_zoneRandom: null };
@@ -1204,6 +1203,40 @@
             return true;
         }
         return false;
+    }
+
+    window.updateModeUI = function() {
+        if (!currentActiveZone) return;
+        const zoneItems = scannedItems.filter(i => i.zone === currentActiveZone);
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+        const unCounted = zoneItems.filter(i => isUncounted(i.initialQty)).length;
+        const unRecounted = zoneItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
+        
+        const btnRandom = document.getElementById('btnModeRandom');
+        const hintEl = document.getElementById('modeStatusHint');
+        let hintTexts = [];
+        
+        if (unCounted > 0 || unRecounted > 0) {
+            btnRandom.disabled = true;
+            if (unCounted > 0) hintTexts.push(`缺 ${unCounted} 初盤`);
+            if (unRecounted > 0) hintTexts.push(`缺 ${unRecounted} 覆核`);
+        } else {
+            btnRandom.disabled = false;
+        }
+        
+        if (currentCountMode === 'recount' && unCounted > 0) {
+            hintEl.innerHTML = `⚠️ 尚有 ${unCounted} 項未初盤，暫不顯示`;
+            hintEl.style.color = '#d97706';
+        } else if (currentCountMode === 'random' && hintTexts.length > 0) {
+            hintEl.innerHTML = `⚠️ 無法抽盤：${hintTexts.join('、')}`;
+            hintEl.style.color = 'var(--ikea-red)';
+        } else if (hintTexts.length > 0) {
+            hintEl.innerHTML = `📌 抽盤鎖定中：${hintTexts.join('、')}`;
+            hintEl.style.color = 'var(--ikea-gray-dark)';
+        } else {
+            hintEl.innerHTML = `✅ 覆核完成，可進行抽盤。`;
+            hintEl.style.color = 'var(--ikea-green)';
+        }
     }
 
     window.renderZoneDashboard = function() {
@@ -2071,7 +2104,10 @@
     const handleEnd = () => { isDrawing=false; };
     canvas.addEventListener('mousedown', handleStart); canvas.addEventListener('mousemove', handleMove); canvas.addEventListener('mouseup', handleEnd); canvas.addEventListener('mouseout', handleEnd);
     canvas.addEventListener('touchstart', handleStart, {passive:false}); canvas.addEventListener('touchmove', handleMove, {passive:false}); canvas.addEventListener('touchend', handleEnd);
-    window.clearCanvas = function() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    window.clearCanvas = function() { 
+        ctx.fillStyle = "#ffffff"; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height); 
+    }
     
     window.openSignaturePad = function(targetId, contextType = 'item') { 
         currentSignContext = { type: contextType, targetId: targetId }; document.getElementById('signatureModal').classList.remove('hidden'); window.resizeCanvas(); window.clearCanvas(); 
@@ -2100,8 +2136,13 @@
         window.pendingCorrectionQty = null; 
     }
     
-    window.saveSignature = function() { window.applySignature(canvas.toDataURL()); window.closeSignaturePad(); }
-    window.saveAsDefaultSignature = function() { const dataUrl = canvas.toDataURL(); localStorage.setItem('ikea_default_signature', dataUrl); alert("已存為個人預設簽名！(此設定只保留於本裝置)"); window.applySignature(dataUrl); window.closeSignaturePad(); }
+    window.saveSignature = function() { window.applySignature(canvas.toDataURL('image/jpeg', 0.5)); window.closeSignaturePad(); }
+    window.saveAsDefaultSignature = function() { 
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.5); 
+        try { localStorage.setItem('ikea_default_signature', dataUrl); } catch(e){}
+        alert("已存為個人預設簽名！(此設定只保留於本裝置)"); 
+        window.applySignature(dataUrl); window.closeSignaturePad(); 
+    }
     
     window.applySignature = function(imgData) { 
         if (currentSignContext.type === 'item') {
