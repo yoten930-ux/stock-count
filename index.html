@@ -211,7 +211,7 @@
         .zone-badge.complete { background: #eff6ff; color: #16a34a; font-weight: 700; }
         .zone-badge.pending { background: #fffbeb; color: #d97706; font-weight: 700; }
 
-        /* === 表格設計 (解決換行問題) === */
+        /* === 表格設計 === */
         .table-wrapper { width: 100%; overflow-x: auto; }
         table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; background: var(--ikea-white); border-radius: 8px; border: 1px solid var(--ikea-border); }
         th, td { border-bottom: 1px solid var(--ikea-border); padding: 12px 10px; text-align: left; }
@@ -243,29 +243,24 @@
         #syncStatus { position: fixed; top: 16px; right: 16px; background: rgba(255,255,255,0.95); color: var(--ikea-dark); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; z-index: 2000; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); backdrop-filter: blur(4px);}
         .sync-dot { width: 8px; height: 8px; background: #ccc; border-radius: 50%; display: inline-block; }
 
-        /* === 儀表板特製設計 (4格數據 - 加入點擊互動) === */
+        /* === 儀表板特製設計 === */
         .dash-summary-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
         .stat-card { 
             background: var(--ikea-white); padding: 16px; border-radius: 12px; 
             border: 1px solid var(--ikea-border); text-align: center; 
             box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-            cursor: pointer; /* 讓卡片可點擊 */
+            cursor: pointer; 
             transition: all 0.2s ease;
         }
         .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-        
-        /* 靜態卡片，不顯示點擊特效與游標 */
         .stat-card.static { cursor: default; }
         .stat-card.static:hover { transform: none; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
-        
         .stat-card.active-filter { box-shadow: 0 0 0 3px var(--ikea-dark); transform: scale(0.98); }
-
         .stat-card.blue { background: var(--ikea-blue); color: white; border-color: var(--ikea-blue); }
         .stat-card.orange { background: #fffbeb; border-color: #fde68a; }
         .stat-card.orange .stat-num { color: #d97706; }
         .stat-card.red { background: #fef2f2; border-color: #fecaca; }
         .stat-card.red .stat-num { color: var(--ikea-red); }
-        
         .stat-num { font-size: 32px; font-weight: 900; margin: 0 0 4px 0; line-height: 1; }
         .stat-label { font-size: 13px; font-weight: 500; opacity: 0.9; }
 
@@ -430,7 +425,11 @@
             </div>
 
             <div id="view-zone-detail" class="hidden">
-                <h2 class="tab-title" id="currentZoneTitle" style="margin-bottom: 16px;">盤區名稱</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h2 class="tab-title" id="currentZoneTitle" style="margin: 0; flex: 1; text-align: left;">盤區名稱</h2>
+                    <!-- 新增刪除盤區按鈕 -->
+                    <button class="btn btn-danger" style="width: auto; margin: 0; padding: 6px 12px; font-size: 13px; border-radius: 20px;" onclick="deleteCurrentZone()">🗑️ 刪除盤區</button>
+                </div>
                 
                 <div style="display: flex; gap: 8px; margin-bottom: 8px; background: #e2e8f0; padding: 4px; border-radius: 30px;">
                     <button class="dept-btn active" id="btnModeInitial" onclick="setCountMode('initial')" style="flex:1;">初盤</button>
@@ -863,12 +862,10 @@
         }
     }
 
-    // === 🔒 嚴謹的分頁狀態檢查 (修復幽靈返回鍵) ===
     window.updateHeaderBackButton = function() {
         const backBtn = document.getElementById('globalBackBtn');
         if(!backBtn) return;
         
-        // 必須同時確認「外層分頁」與「內層明細」都是顯示狀態
         const countTabVisible = !document.getElementById('tab-count').classList.contains('hidden');
         const historyTabVisible = !document.getElementById('tab-history').classList.contains('hidden');
         
@@ -905,6 +902,33 @@
             osc.connect(sharedAudioCtx.destination); osc.start(); osc.stop(sharedAudioCtx.currentTime + 0.1); 
         } catch(e) {}
         if(navigator.vibrate) navigator.vibrate([100]); 
+    }
+
+    // === 🗑️ 新增：刪除目前盤區功能 ===
+    window.deleteCurrentZone = function() {
+        if (!currentActiveZone) return;
+        
+        if (confirm(`⚠️ 警告：確定要刪除整個盤區「${currentActiveZone}」嗎？\n裡面的所有商品資料也將一併被清空，此操作無法復原！`)) {
+            // 1. 過濾掉該盤區的商品
+            scannedItems = scannedItems.filter(item => item.zone !== currentActiveZone);
+            
+            // 2. 移除盤區紀錄與狀態
+            knownZones.delete(currentActiveZone);
+            delete zoneStatus[currentActiveZone];
+            delete zoneDepartments[currentActiveZone];
+            
+            // 3. 重新計算快取並同步雲端
+            window.buildZoneCategoryCache();
+            syncToFirebase();
+            
+            // 4. 退回列表並重新渲染相關畫面
+            window.backToZoneList();
+            window.renderZoneChecklist();
+            window.renderCreateListTable();
+            window.renderQuickZoneButtons();
+            
+            alert(`✅ 盤區「${currentActiveZone}」已成功刪除！`);
+        }
     }
 
     window.exportJsonData = function() {
@@ -956,7 +980,7 @@
         if (tab === 'history') { window.renderHistoryList(); window.stopCameraScanner(); } 
         if (tab === 'home') { window.stopCameraScanner(); }
         
-        window.updateHeaderBackButton(); // 切換分頁時重新判定是否顯示返回鍵
+        window.updateHeaderBackButton();
     }
 
     window.renderQuickZoneButtons = function() {
@@ -1115,7 +1139,6 @@
         return false;
     }
 
-    // === 刪除多餘的 updateModeUI 副本，僅保留這份完整版 ===
     window.updateModeUI = function() {
         if (!currentActiveZone) return;
         const zoneItems = scannedItems.filter(i => i.zone === currentActiveZone);
@@ -1137,7 +1160,7 @@
         
         if (currentCountMode === 'recount' && unCounted > 0) {
             hintEl.innerHTML = `⚠️ 尚有 ${unCounted} 項未初盤，暫不顯示`;
-            hintEl.style.color = 'var(--ikea-yellow-hover)';
+            hintEl.style.color = '#d97706';
         } else if (currentCountMode === 'random' && hintTexts.length > 0) {
             hintEl.innerHTML = `⚠️ 無法抽盤：${hintTexts.join('、')}`;
             hintEl.style.color = 'var(--ikea-red)';
@@ -1794,6 +1817,40 @@
         }
     }
 
+    window.updateModeUI = function() {
+        if (!currentActiveZone) return;
+        const zoneItems = scannedItems.filter(i => i.zone === currentActiveZone);
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+        const unCounted = zoneItems.filter(i => isUncounted(i.initialQty)).length;
+        const unRecounted = zoneItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
+        
+        const btnRandom = document.getElementById('btnModeRandom');
+        const hintEl = document.getElementById('modeStatusHint');
+        let hintTexts = [];
+        
+        if (unCounted > 0 || unRecounted > 0) {
+            btnRandom.disabled = true;
+            if (unCounted > 0) hintTexts.push(`缺 ${unCounted} 初盤`);
+            if (unRecounted > 0) hintTexts.push(`缺 ${unRecounted} 覆核`);
+        } else {
+            btnRandom.disabled = false;
+        }
+        
+        if (currentCountMode === 'recount' && unCounted > 0) {
+            hintEl.innerHTML = `⚠️ 尚有 ${unCounted} 項未初盤，暫不顯示`;
+            hintEl.style.color = 'var(--ikea-yellow-hover)';
+        } else if (currentCountMode === 'random' && hintTexts.length > 0) {
+            hintEl.innerHTML = `⚠️ 無法抽盤：${hintTexts.join('、')}`;
+            hintEl.style.color = 'var(--ikea-red)';
+        } else if (hintTexts.length > 0) {
+            hintEl.innerHTML = `📌 抽盤鎖定中：${hintTexts.join('、')}`;
+            hintEl.style.color = 'var(--ikea-gray-dark)';
+        } else {
+            hintEl.innerHTML = `✅ 覆核完成，可進行抽盤。`;
+            hintEl.style.color = 'var(--ikea-green)';
+        }
+    }
+
     window.renderZoneItems = function() {
         const container = document.getElementById('inventoryListContainer'); container.innerHTML = ""; let renderedCount = 0;
         const isUncounted = (val) => val === null || val === undefined || val === "";
@@ -1998,7 +2055,7 @@
             window.applySignature(savedSig);
             window.closeSignaturePad();
         } else {
-            alert("找不到預設簽名，請先手動簽名並儲存！");
+            alert("找不到預設簽名，請先手提簽名並儲存！");
         }
     }
     
