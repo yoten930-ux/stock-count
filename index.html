@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 精準狀態燈號版</title>
+    <title>SFM 完整盤點系統 - 狀態防呆與極簡流暢版</title>
     
     <!-- 引入 Noto Sans TC 字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -107,6 +107,8 @@
         
         .quick-zone-builder { background: transparent; }
         .quick-zone-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+        
+        /* === 首頁大型選單按鈕 === */
         .home-menu-btn { 
             background: var(--ikea-white); border: 1px solid var(--ikea-border); border-radius: 12px; padding: 20px; margin-bottom: 12px; 
             text-align: left; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; text-decoration: none; 
@@ -133,7 +135,7 @@
         .zone-btn:hover { border-color: #cbd5e1; }
         .zone-btn-title { font-size: 16px; font-weight: 700; color: var(--ikea-dark); }
         
-        /* === 精準狀態顏色標籤 === */
+        /* 狀態顏色標籤 */
         .zone-badge-grey { background: #f1f5f9; color: #64748b; font-size: 13px; padding: 6px 12px; border-radius: 20px; font-weight: 500; }
         .zone-badge-red { background: #fef2f2; color: #ef4444; font-size: 13px; padding: 6px 12px; border-radius: 20px; font-weight: 700; border: 1px solid #fecaca; }
         .zone-badge-orange { background: #fff7ed; color: #d97706; font-size: 13px; padding: 6px 12px; border-radius: 20px; font-weight: 700; border: 1px solid #ffedd5; }
@@ -209,6 +211,7 @@
         <!-- ================= 分頁 0：系統首頁 ================= -->
         <div id="tab-home">
             <h2 class="tab-title">🏠 系統首頁</h2>
+
             <div class="input-group" style="background-color: transparent; border: 1px dashed #cbd5e1;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 14px; font-weight: 500; color: #475569;">👤 目前操作員：<strong id="displayOperatorName" style="color:var(--ikea-blue); font-size: 16px;">未設定</strong></span>
@@ -219,16 +222,40 @@
                     <label for="blindCountToggle" style="margin: 0; cursor: pointer; font-size: 14px; font-weight: 500; color: #475569;">開啟「盲盤模式」(覆核時隱藏初盤紀錄)</label>
                 </div>
             </div>
-            <button class="home-menu-btn" onclick="switchTab('create')"><h3 style="color: var(--ikea-blue);">📋 製作盤單</h3><p>更新商品主檔與各部門盤點區域設定</p></button>
-            <button class="home-menu-btn" onclick="switchTab('count')"><h3 style="color: var(--ikea-blue);">📱 進行現場盤點</h3><p>執行初盤、盲盤覆核、抽盤與人員數位簽核</p></button>
-            <button class="home-menu-btn" onclick="switchTab('dashboard')"><h3 style="color: var(--ikea-dark);">📊 總覽儀表板</h3><p>一頁掌握全館進度、異常商品與預估結束時間</p></button>
-            <button class="home-menu-btn" onclick="exportToExcel()"><h3 style="color: var(--ikea-green);">💾 合併結算與匯出</h3><p>將全館盤點與簽核資料合併匯出並封存</p></button>
+            
+            <button class="home-menu-btn" onclick="switchTab('create')">
+                <h3 style="color: var(--ikea-blue);">📋 製作盤單</h3>
+                <p>更新商品主檔與各部門盤點區域設定</p>
+            </button>
+            <button class="home-menu-btn" onclick="switchTab('count')">
+                <h3 style="color: var(--ikea-blue);">📱 進行現場盤點</h3>
+                <p>執行初盤、盲盤覆核、抽盤與人員數位簽核</p>
+            </button>
+            <button class="home-menu-btn" onclick="switchTab('dashboard')">
+                <h3 style="color: var(--ikea-dark);">📊 總覽儀表板</h3>
+                <p>一頁掌握全館進度、異常商品與預估結束時間</p>
+            </button>
+            <button class="home-menu-btn" onclick="exportToExcel()">
+                <h3 style="color: var(--ikea-green);">💾 合併結算與匯出</h3>
+                <p>將全館盤點與簽核資料合併匯出並封存</p>
+            </button>
+            
             <div style="display: flex; gap: 12px; margin-bottom: 12px;">
-                <button class="home-menu-btn" style="margin-bottom:0; align-items:center; text-align:center; padding:16px;" onclick="exportJsonData()"><h3 style="font-size:15px; color:#475569; margin:0;">📤 系統備份</h3></button>
-                <button class="home-menu-btn" style="margin-bottom:0; align-items:center; text-align:center; padding:16px;" onclick="document.getElementById('jsonUpload').click()"><h3 style="font-size:15px; color:#475569; margin:0;">📥 系統還原</h3><input type="file" id="jsonUpload" accept=".json" class="hidden" onchange="importJsonData(event)"></button>
+                <button class="home-menu-btn" style="margin-bottom:0; align-items:center; text-align:center; padding:16px;" onclick="exportJsonData()">
+                    <h3 style="font-size:15px; color:#475569; margin:0;">📤 系統備份</h3>
+                </button>
+                <button class="home-menu-btn" style="margin-bottom:0; align-items:center; text-align:center; padding:16px;" onclick="document.getElementById('jsonUpload').click()">
+                    <h3 style="font-size:15px; color:#475569; margin:0;">📥 系統還原</h3>
+                    <input type="file" id="jsonUpload" accept=".json" class="hidden" onchange="importJsonData(event)">
+                </button>
             </div>
-            <button class="home-menu-btn" onclick="clearAllCurrentData()"><h3 style="color: var(--ikea-red); font-size:15px; text-align:center; width:100%; display:block; margin:0;">🗑️ 重新開始 (清空當前盤單)</h3></button>
-            <button class="home-menu-btn" onclick="switchTab('history')"><h3 style="color: #64748b; font-size:15px; text-align:center; width:100%; display:block; margin:0;">🗄️ 歷史紀錄查詢</h3></button>
+
+            <button class="home-menu-btn" onclick="clearAllCurrentData()">
+                <h3 style="color: var(--ikea-red); font-size:15px; text-align:center; width:100%; display:block; margin:0;">🗑️ 重新開始 (清空當前盤單)</h3>
+            </button>
+            <button class="home-menu-btn" onclick="switchTab('history')">
+                <h3 style="color: #64748b; font-size:15px; text-align:center; width:100%; display:block; margin:0;">🗄️ 歷史紀錄查詢</h3>
+            </button>
         </div>
 
         <!-- ================= 分頁 1：製作盤單 ================= -->
@@ -597,7 +624,7 @@
 
     window.getZoneCategory = function(zoneName) { return window.zoneCategoryCache[zoneName] || '其他'; }
 
-    // 🚦 精準的 8 段式狀態判斷器
+    // === 🚦 精準的 8 段式狀態判斷器 ===
     window.getZoneStatusDetails = function(z) {
         const itemsInZone = scannedItems.filter(i => i.zone === z);
         const zStat = zoneStatus[z] || {};
@@ -606,23 +633,19 @@
         const isUncounted = (val) => val === null || val === undefined || val === "";
         const uncountedCount = itemsInZone.filter(i => isUncounted(i.initialQty)).length;
         
-        // 1. 初盤階段
         if (uncountedCount === itemsInZone.length) return { label: '待初盤', class: 'zone-badge-red', code: 'pending_initial' };
         if (uncountedCount > 0) return { label: '初盤中', class: 'zone-badge-orange', code: 'doing_initial' };
         if (!zStat.sign_zoneInitial) return { label: '待初盤簽名', class: 'zone-badge-red', code: 'pending_initial_sign' };
         
-        // 2. 覆盤階段
         const unRecounted = itemsInZone.filter(i => !i.recountDone).length;
         if (unRecounted > 0) return { label: '待覆盤', class: 'zone-badge-blue', code: 'pending_recount' };
         if (!zStat.sign_zoneRecount) return { label: '待覆盤簽名', class: 'zone-badge-blue', code: 'pending_recount_sign' };
         
-        // 3. 抽盤階段
         const randomItems = itemsInZone.filter(i => i.isRandomChecked);
         const unRandomed = randomItems.filter(i => !i.randomDone).length;
         if (unRandomed > 0) return { label: '待抽盤', class: 'zone-badge-purple', code: 'pending_random' };
         if (!zStat.sign_zoneRandom) return { label: '待抽盤簽名', class: 'zone-badge-purple', code: 'pending_random_sign' };
         
-        // 4. 完成
         return { label: '✅ 已驗收', class: 'zone-badge-green', code: 'completed' };
     }
 
@@ -1144,6 +1167,48 @@
             return true;
         }
         return false;
+    }
+
+    window.updateModeUI = function() {
+        if (!currentActiveZone) return;
+        const zoneItems = scannedItems.filter(i => i.zone === currentActiveZone);
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+        const unCounted = zoneItems.filter(i => isUncounted(i.initialQty)).length;
+        const unRecounted = zoneItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
+        
+        const btnRandom = document.getElementById('btnModeRandom');
+        const hintEl = document.getElementById('modeStatusHint');
+        let hintTexts = [];
+        
+        if (unCounted > 0 || unRecounted > 0) {
+            btnRandom.disabled = true;
+            if (unCounted > 0) hintTexts.push(`缺 ${unCounted} 初盤`);
+            if (unRecounted > 0) hintTexts.push(`缺 ${unRecounted} 覆核`);
+        } else {
+            btnRandom.disabled = false;
+        }
+        
+        const zStat = zoneStatus[currentActiveZone] || {};
+
+        if (currentCountMode === 'recount' && unCounted > 0) {
+            hintEl.innerHTML = `⚠️ 尚有 ${unCounted} 項未初盤，暫不顯示`;
+            hintEl.style.color = '#d97706';
+        } else if (currentCountMode === 'recount' && !zStat.sign_zoneInitial) {
+            hintEl.innerHTML = `⚠️ 請先完成初盤作業的「負責人簽名」，才能進行覆盤。`;
+            hintEl.style.color = 'var(--ikea-red)';
+        } else if (currentCountMode === 'random' && hintTexts.length > 0) {
+            hintEl.innerHTML = `⚠️ 無法抽盤：${hintTexts.join('、')}`;
+            hintEl.style.color = 'var(--ikea-red)';
+        } else if (currentCountMode === 'random' && !zStat.sign_zoneRecount) {
+            hintEl.innerHTML = `⚠️ 請先完成覆盤作業的「負責人簽名」，才能進行抽盤。`;
+            hintEl.style.color = 'var(--ikea-red)';
+        } else if (hintTexts.length > 0) {
+            hintEl.innerHTML = `📌 抽盤鎖定中：${hintTexts.join('、')}`;
+            hintEl.style.color = 'var(--ikea-gray-dark)';
+        } else {
+            hintEl.innerHTML = `✅ 此階段可正常進行。`;
+            hintEl.style.color = 'var(--ikea-green)';
+        }
     }
 
     window.renderZoneDashboard = function() {
