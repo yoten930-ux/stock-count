@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 狀態防呆與極簡流暢版</title>
+    <title>SFM 完整盤點系統 - 終極防爆與狀態精準版</title>
     
     <!-- 引入 Noto Sans TC 字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -57,7 +57,7 @@
         /* === 頁面大標題 === */
         .tab-title { text-align: center; color: var(--ikea-blue); margin-top: 0; margin-bottom: 24px; font-size: 24px; font-weight: 900; letter-spacing: 0.5px; }
 
-        /* === 底部導覽列 (Bottom Navbar) === */
+        /* === 底部導覽列 === */
         .navbar { 
             position: fixed; bottom: 0; left: 0; width: 100%; display: flex; background: var(--ikea-white); 
             box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 100; border-top: 1px solid var(--ikea-border);
@@ -107,8 +107,6 @@
         
         .quick-zone-builder { background: transparent; }
         .quick-zone-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
-        
-        /* === 首頁大型選單按鈕 === */
         .home-menu-btn { 
             background: var(--ikea-white); border: 1px solid var(--ikea-border); border-radius: 12px; padding: 20px; margin-bottom: 12px; 
             text-align: left; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; text-decoration: none; 
@@ -197,9 +195,7 @@
 </head>
 <body>
 
-    <div id="syncStatus">
-        <span class="sync-dot"></span> <span id="syncText">系統初始化中...</span>
-    </div>
+    <div id="syncStatus"><span class="sync-dot"></span> <span id="syncText">系統初始化中...</span></div>
 
     <!-- 頂端全域導覽列 -->
     <div class="global-header">
@@ -211,7 +207,6 @@
         <!-- ================= 分頁 0：系統首頁 ================= -->
         <div id="tab-home">
             <h2 class="tab-title">🏠 系統首頁</h2>
-
             <div class="input-group" style="background-color: transparent; border: 1px dashed #cbd5e1;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 14px; font-weight: 500; color: #475569;">👤 目前操作員：<strong id="displayOperatorName" style="color:var(--ikea-blue); font-size: 16px;">未設定</strong></span>
@@ -222,51 +217,25 @@
                     <label for="blindCountToggle" style="margin: 0; cursor: pointer; font-size: 14px; font-weight: 500; color: #475569;">開啟「盲盤模式」(覆核時隱藏初盤紀錄)</label>
                 </div>
             </div>
-            
-            <button class="home-menu-btn" onclick="switchTab('create')">
-                <h3 style="color: var(--ikea-blue);">📋 製作盤單</h3>
-                <p>更新商品主檔與各部門盤點區域設定</p>
-            </button>
-            <button class="home-menu-btn" onclick="switchTab('count')">
-                <h3 style="color: var(--ikea-blue);">📱 進行現場盤點</h3>
-                <p>執行初盤、盲盤覆核、抽盤與人員數位簽核</p>
-            </button>
-            <button class="home-menu-btn" onclick="switchTab('dashboard')">
-                <h3 style="color: var(--ikea-dark);">📊 總覽儀表板</h3>
-                <p>一頁掌握全館進度、異常商品與預估結束時間</p>
-            </button>
-            <button class="home-menu-btn" onclick="exportToExcel()">
-                <h3 style="color: var(--ikea-green);">💾 合併結算與匯出</h3>
-                <p>將全館盤點與簽核資料合併匯出並封存</p>
-            </button>
-            
+            <button class="home-menu-btn" onclick="switchTab('create')"><h3 style="color: var(--ikea-blue);">📋 製作盤單</h3><p>更新商品主檔與各部門盤點區域設定</p></button>
+            <button class="home-menu-btn" onclick="switchTab('count')"><h3 style="color: var(--ikea-blue);">📱 進行現場盤點</h3><p>執行初盤、盲盤覆核、抽盤與人員數位簽核</p></button>
+            <button class="home-menu-btn" onclick="switchTab('dashboard')"><h3 style="color: var(--ikea-dark);">📊 總覽儀表板</h3><p>一頁掌握全館進度、異常商品與預估結束時間</p></button>
+            <button class="home-menu-btn" onclick="exportToExcel()"><h3 style="color: var(--ikea-green);">💾 合併結算與匯出</h3><p>將全館盤點與簽核資料合併匯出並封存</p></button>
             <div style="display: flex; gap: 12px; margin-bottom: 12px;">
-                <button class="home-menu-btn" style="margin-bottom:0; align-items:center; text-align:center; padding:16px;" onclick="exportJsonData()">
-                    <h3 style="font-size:15px; color:#475569; margin:0;">📤 系統備份</h3>
-                </button>
-                <button class="home-menu-btn" style="margin-bottom:0; align-items:center; text-align:center; padding:16px;" onclick="document.getElementById('jsonUpload').click()">
-                    <h3 style="font-size:15px; color:#475569; margin:0;">📥 系統還原</h3>
-                    <input type="file" id="jsonUpload" accept=".json" class="hidden" onchange="importJsonData(event)">
-                </button>
+                <button class="home-menu-btn" style="margin-bottom:0; align-items:center; text-align:center; padding:16px;" onclick="exportJsonData()"><h3 style="font-size:15px; color:#475569; margin:0;">📤 系統備份</h3></button>
+                <button class="home-menu-btn" style="margin-bottom:0; align-items:center; text-align:center; padding:16px;" onclick="document.getElementById('jsonUpload').click()"><h3 style="font-size:15px; color:#475569; margin:0;">📥 系統還原</h3><input type="file" id="jsonUpload" accept=".json" class="hidden" onchange="importJsonData(event)"></button>
             </div>
-
-            <button class="home-menu-btn" onclick="clearAllCurrentData()">
-                <h3 style="color: var(--ikea-red); font-size:15px; text-align:center; width:100%; display:block; margin:0;">🗑️ 重新開始 (清空當前盤單)</h3>
-            </button>
-            <button class="home-menu-btn" onclick="switchTab('history')">
-                <h3 style="color: #64748b; font-size:15px; text-align:center; width:100%; display:block; margin:0;">🗄️ 歷史紀錄查詢</h3>
-            </button>
+            <button class="home-menu-btn" onclick="clearAllCurrentData()"><h3 style="color: var(--ikea-red); font-size:15px; text-align:center; width:100%; display:block; margin:0;">🗑️ 重新開始 (清空當前盤單)</h3></button>
+            <button class="home-menu-btn" onclick="switchTab('history')"><h3 style="color: #64748b; font-size:15px; text-align:center; width:100%; display:block; margin:0;">🗄️ 歷史紀錄查詢</h3></button>
         </div>
 
         <!-- ================= 分頁 1：製作盤單 ================= -->
         <div id="tab-create" class="hidden">
             <h2 class="tab-title">📋 製作盤單</h2>
-            
             <div class="dept-switcher">
                 <button class="dept-btn active" data-dept="SFM" onclick="window.setDepartment('SFM')">超市與美食</button>
                 <button class="dept-btn" data-dept="REST" onclick="window.setDepartment('REST')">IKEA 餐廳</button>
             </div>
-
             <div class="input-group" style="border-left: 4px solid var(--ikea-blue);">
                 <label>📁 第一步：更新商品主檔與盤區</label>
                 <input type="file" id="excelUpload" accept=".xlsx, .xls" onchange="handleFileUpload(event)">
@@ -275,13 +244,10 @@
                     <label for="importItemsCheckbox" style="margin: 0; font-weight: 500; font-size: 14px; cursor: pointer;">同時匯入本部門預設商品清單</label>
                 </div>
             </div>
-
             <div class="input-group">
                 <label>第二步：快速切換盤點區域</label>
                 <div class="quick-zone-builder">
-                    <div class="category-tabs" id="quickZoneCategories">
-                        <button class="cat-tab" onclick="selectQuickZonePrefix('自訂')">✍️ 自訂</button>
-                    </div>
+                    <div class="category-tabs" id="quickZoneCategories"><button class="cat-tab" onclick="selectQuickZonePrefix('自訂')">✍️ 自訂</button></div>
                     <div class="quick-zone-row">
                         <input type="text" id="quickZonePrefix" placeholder="前綴" style="width:25%; background:#f1f5f9; text-align:center; border-color:transparent;" readonly>
                         <span style="font-weight:bold; color:var(--ikea-gray-dark);">+</span>
@@ -291,7 +257,6 @@
                     </div>
                 </div>
             </div>
-
             <div class="input-group">
                 <label>第三步：手動輸入或掃描加入</label>
                 <div style="display:flex; gap:10px; margin-bottom: 12px;">
@@ -300,7 +265,6 @@
                 </div>
                 <button class="btn btn-primary" onclick="processScan()">加入清單</button>
             </div>
-
             <div id="zoneSpecificTableContainer">
                 <h4 style="color: var(--ikea-dark); padding-bottom: 8px; margin-bottom: 8px;">📍 本區待盤點商品</h4>
                 <div class="table-wrapper">
@@ -311,7 +275,6 @@
                 </div>
                 <p id="emptyTableMsg" style="text-align:center; color:#888; font-size:14px; margin-top:20px;">目前尚無商品，請先選擇上方盤區。</p>
             </div>
-            
             <div id="manualAddSection" class="hidden" style="background: #fffbeb; padding: 16px; border-radius: 12px; margin-bottom: 16px; margin-top:16px; border: 1px solid #fde68a;">
                 <label style="color:#d97706; font-size: 14px;">⚠️ 系統無此貨號，請手動建檔：</label>
                 <input type="text" id="manualCode" disabled style="margin-bottom:10px; background:rgba(255,255,255,0.5); border-color:transparent; color:#666;">
@@ -322,7 +285,6 @@
                     <button class="btn btn-success" style="margin-bottom:0;" onclick="saveManualItem()">存入並加入</button>
                 </div>
             </div>
-
             <div class="input-group" style="margin-top: 24px; padding-top: 24px; border-top: 2px dashed var(--ikea-border); border-radius: 0; border-left: none; border-right: none; border-bottom: none; box-shadow: none; background: transparent;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <label style="margin:0;">📋 第四步：本部門盤區清單</label>
@@ -338,14 +300,11 @@
         <div id="tab-count" class="hidden">
             <div id="view-zone-list">
                 <h2 class="tab-title">📱 現場盤點</h2>
-                
                 <div class="dept-switcher">
                     <button class="dept-btn active" data-dept="SFM" onclick="window.setDepartment('SFM')">超市與美食</button>
                     <button class="dept-btn" data-dept="REST" onclick="window.setDepartment('REST')">IKEA 餐廳</button>
                 </div>
-
                 <div id="dashboardTabsContainer" class="category-tabs" style="margin-bottom: 12px;"></div>
-                
                 <div id="dashboardStatusTabsContainer" class="category-tabs" style="margin-bottom: 16px;">
                     <button class="cat-tab active" data-status="all" onclick="window.setDashboardStatus('all')">全部狀態</button>
                     <button class="cat-tab" data-status="pending_initial" onclick="window.setDashboardStatus('pending_initial')">待初盤</button>
@@ -353,7 +312,6 @@
                     <button class="cat-tab" data-status="pending_random" onclick="window.setDashboardStatus('pending_random')">待抽盤</button>
                     <button class="cat-tab" data-status="completed" onclick="window.setDashboardStatus('completed')">已完成</button>
                 </div>
-
                 <div id="dashboardOverallStatus"></div>
                 <div id="zoneDashboardContainer"><p style="text-align:center; color:#94a3b8;">本部門尚未建立任何盤單資料。</p></div>
             </div>
@@ -404,31 +362,15 @@
         <!-- ================= 分頁 4：總覽儀表板 ================= -->
         <div id="tab-dashboard" class="hidden">
             <h2 class="tab-title">📊 總覽儀表板</h2>
-
-            <!-- 數據統計卡片 -->
             <div class="dash-summary-container">
-                <div class="stat-card blue" id="cardDashAll" onclick="window.setDashFilter('all')">
-                    <div class="stat-num" id="dashTotalPercent">0%</div>
-                    <div class="stat-label">整體完成度</div>
-                </div>
-                <div class="stat-card orange" id="cardDashCompleted" onclick="window.setDashFilter('completed')">
-                    <div class="stat-num" id="dashZoneStatsVal">0</div>
-                    <div class="stat-label">已驗收盤區</div>
-                </div>
-                <div class="stat-card red" id="cardDashPending" onclick="window.setDashFilter('pending')">
-                    <div class="stat-num" id="dashIssuesVal">0</div>
-                    <div class="stat-label">異常/待處理</div>
-                </div>
-                <div class="stat-card static" id="cardDashItems" style="background:#f8fafc; border-color:#e2e8f0; color:#475569;">
-                    <div class="stat-num" id="dashItemStatsVal" style="color:#334155;">0</div>
-                    <div class="stat-label">已盤商品數</div>
-                </div>
+                <div class="stat-card blue" id="cardDashAll" onclick="window.setDashFilter('all')"><div class="stat-num" id="dashTotalPercent">0%</div><div class="stat-label">整體完成度</div></div>
+                <div class="stat-card orange" id="cardDashCompleted" onclick="window.setDashFilter('completed')"><div class="stat-num" id="dashZoneStatsVal">0</div><div class="stat-label">已驗收盤區</div></div>
+                <div class="stat-card red" id="cardDashPending" onclick="window.setDashFilter('pending')"><div class="stat-num" id="dashIssuesVal">0</div><div class="stat-label">異常/待處理</div></div>
+                <div class="stat-card static" id="cardDashItems" style="background:#f8fafc; border-color:#e2e8f0; color:#475569;"><div class="stat-num" id="dashItemStatsVal" style="color:#334155;">0</div><div class="stat-label">已盤商品數</div></div>
             </div>
-
             <div id="dashETA" style="background: var(--ikea-white); border: 1px solid var(--ikea-border); border-radius: 12px; padding: 16px; margin-bottom: 24px; text-align: center; font-size: 14px; font-weight: 700; color: var(--ikea-blue); box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
                 ⏳ 預估剩餘時間：系統計算中...
             </div>
-
             <h3 id="dashIssuesTitle" style="color: var(--ikea-dark); font-size: 18px; margin-bottom: 12px;">⚠️ 待處理清單 (未完成)</h3>
             <div id="dashIssuesContainer"></div>
         </div>
@@ -436,17 +378,12 @@
         <!-- ================= 分頁 3：歷史紀錄 ================= -->
         <div id="tab-history" class="hidden">
             <h2 class="tab-title">🗄️ 歷史紀錄查詢</h2>
-            
-            <div id="historyListView">
-                <div id="historyListContainer"></div>
-            </div>
-
+            <div id="historyListView"><div id="historyListContainer"></div></div>
             <div id="historyDetailView" class="hidden">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <h3 id="historyDetailTitle" style="color: var(--ikea-dark); margin: 0; font-size: 18px;"></h3>
                     <button class="btn btn-danger" style="width: auto; margin: 0; padding: 6px 12px; font-size: 13px;" id="btnDeleteHistory">🗑️ 刪除紀錄</button>
                 </div>
-                
                 <div class="table-wrapper" style="background: var(--ikea-white); border-radius: 12px; overflow: hidden; border: 1px solid var(--ikea-border);">
                     <table class="history-table" style="margin-top: 0; border: none;">
                         <thead><tr><th>部</th><th>區</th><th>貨號</th><th>品名</th><th style="width:40px; text-align:center;">量</th></tr></thead>
@@ -456,7 +393,6 @@
                 <div id="historySignatures" style="margin-top: 24px;"></div>
             </div>
         </div>
-
     </div>
 
     <!-- 底部導覽列 -->
@@ -482,17 +418,13 @@
         <div class="modal-container" style="text-align: center;">
             <h3 style="margin-top:0; color:var(--ikea-dark);">🔍 數量覆核</h3>
             <p style="font-size: 15px; color: var(--ikea-dark); margin-bottom: 16px;">商品：<strong id="verifyScanName"></strong></p>
-            
             <div id="verifyScanExpectedWrapper" style="background: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 16px; border: 1px solid #e2e8f0;">
                 <p style="font-size: 14px; color: #64748b; margin: 0;">系統初盤紀錄</p>
                 <strong id="verifyScanExpected" style="font-size: 24px; color: var(--ikea-blue); display: block; margin-top: 4px;"></strong>
             </div>
-            
             <label style="display: block; margin-bottom: 8px;">請輸入本次清點數量：</label>
             <input type="number" inputmode="decimal" min="0" step="any" id="verifyScanActual" placeholder="輸入實際數量" oninput="window.calculateVerifyDiff()" style="width:100%; padding:14px; border:2px solid var(--ikea-border); border-radius:8px; font-size:20px; text-align:center; margin-bottom:12px; background:#fff;">
-            
             <div id="verifyScanDiff" style="font-weight: 700; font-size: 16px; margin-bottom: 20px; min-height: 24px;"></div>
-            
             <div style="display:flex; gap:12px;">
                 <button class="btn btn-outline" style="border-color:#cbd5e1;" onclick="cancelVerifyScan()">取消</button>
                 <button class="btn btn-primary" onclick="submitVerifyScan()">確認核對</button>
@@ -505,17 +437,14 @@
         <div class="modal-container">
             <h3 style="margin-top: 0; text-align:center; color:var(--ikea-dark);">✍️ 簽名核准</h3>
             <canvas id="sigCanvas"></canvas>
-            
             <div style="display:flex; gap:12px; margin-top:16px;">
                 <button class="btn btn-outline" style="flex:1; border-color:#cbd5e1;" onclick="clearCanvas()">清除重寫</button>
                 <button class="btn btn-blue" style="flex:2;" onclick="saveSignature()">確認送出</button>
             </div>
-            
             <div id="defaultSignatureSection" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--ikea-border);">
                 <p style="font-size:13px; color:#64748b; margin:0 0 10px 0; font-weight: 500; text-align:center;">快速套用個人簽名</p>
                 <button class="btn btn-primary" style="background:var(--ikea-white); border:2px solid var(--ikea-yellow); color:var(--ikea-dark);" onclick="useDefaultSignature()">🔏 一鍵套用預設簽名</button>
             </div>
-            
             <div style="display:flex; gap:12px; margin-top:12px;">
                 <button class="btn btn-outline" style="flex:1; font-size: 14px; border-color:#cbd5e1;" onclick="saveAsDefaultSignature()">💾 存為預設</button>
                 <button class="btn btn-outline" style="flex:1; font-size: 14px; color: var(--ikea-red); border-color: transparent; background:#fef2f2;" onclick="closeSignaturePad()">取消</button>
@@ -624,7 +553,6 @@
 
     window.getZoneCategory = function(zoneName) { return window.zoneCategoryCache[zoneName] || '其他'; }
 
-    // === 🚦 精準的 8 段式狀態判斷器 ===
     window.getZoneStatusDetails = function(z) {
         const itemsInZone = scannedItems.filter(i => i.zone === z);
         const zStat = zoneStatus[z] || {};
@@ -1530,6 +1458,719 @@
         document.getElementById('historyDetailView').classList.add('hidden'); 
         window.updateHeaderBackButton();
     }
+
+    window.handleFileUpload = function(event) {
+        const file = event.target.files[0]; 
+        if (!file) return;
+        const shouldImportItems = document.getElementById('importItemsCheckbox').checked;
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            try {
+                const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                
+                if (workbook.Sheets['SETTING']) {
+                    const rows = XLSX.utils.sheet_to_json(workbook.Sheets['SETTING'], { header: 1 });
+                    for (let i = 1; i < rows.length; i++) {
+                        if (rows[i] && rows[i].length > 0 && rows[i][0]) {
+                            const rawCode = String(rows[i][0]).trim();
+                            const safeCode = rawCode.replace(/[\.#$\[\]\/]/g, '_');
+                            productDatabase[safeCode] = { 
+                                name: rows[i][1] ? String(rows[i][1]).trim() : "未知名稱", 
+                                unit: rows[i][2] ? String(rows[i][2]).trim() : "PC" 
+                            };
+                        }
+                    }
+                }
+
+                let importedItemsCount = 0;
+                let sfmImportedZones = [];
+                let restImportedZones = [];
+
+                workbook.SheetNames.forEach(originalSheetName => {
+                    if (!['SETTING', 'display bin', '工作表1'].includes(originalSheetName)) {
+                        
+                        const safeSheetName = String(originalSheetName).replace(/[\.#$\[\]\/]/g, '_');
+                        let targetDept = currentDepartment;
+                        const upperName = safeSheetName.toUpperCase();
+                        
+                        if (upperName.startsWith('REST') || upperName.startsWith('K') || upperName.startsWith('R-') || upperName.includes('廚')) {
+                            targetDept = 'REST';
+                            restImportedZones.push(safeSheetName);
+                        } else if (upperName.startsWith('BIS') || upperName.startsWith('BUF') || upperName.startsWith('SFM') || upperName.startsWith('STO') || upperName.startsWith('CHE')) {
+                            targetDept = 'SFM';
+                            sfmImportedZones.push(safeSheetName);
+                        } else {
+                            if(currentDepartment === 'REST') restImportedZones.push(safeSheetName);
+                            else sfmImportedZones.push(safeSheetName);
+                        }
+
+                        knownZones.add(safeSheetName); 
+                        if(!zoneDepartments[safeSheetName]) {
+                            zoneDepartments[safeSheetName] = targetDept;
+                        }
+
+                        if (shouldImportItems) {
+                            const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[originalSheetName], { header: 1 });
+                            let headerIdx = -1; let itemColIdx = -1; let nameColIdx = -1;
+                            
+                            for (let r = 0; r < sheetData.length; r++) {
+                                if (sheetData[r]) {
+                                    const rowStr = sheetData[r].join("");
+                                    if (rowStr.includes("貨號") || rowStr.includes("編號") || rowStr.includes("條碼") || rowStr.includes("品名")) { 
+                                        headerIdx = r; 
+                                        itemColIdx = sheetData[r].findIndex(cell => { 
+                                            if(cell === null || cell === undefined) return false;
+                                            const s = String(cell); 
+                                            return s.includes("貨號") || s.includes("編號") || s.includes("條碼"); 
+                                        }); 
+                                        nameColIdx = sheetData[r].findIndex(cell => {
+                                            if(cell === null || cell === undefined) return false;
+                                            return String(cell).includes("品名");
+                                        }); 
+                                        break; 
+                                    }
+                                }
+                            }
+                            
+                            if (headerIdx !== -1 && itemColIdx !== -1) {
+                                for (let r = headerIdx + 1; r < sheetData.length; r++) {
+                                    const row = sheetData[r];
+                                    if (row && row[itemColIdx]) {
+                                        const rawCode = String(row[itemColIdx]).trim();
+                                        if (rawCode && rawCode !== "NaN" && rawCode !== "undefined") {
+                                            const safeCode = rawCode.replace(/[\.#$\[\]\/]/g, '_');
+                                            const dbInfo = productDatabase[safeCode];
+                                            const name = dbInfo ? dbInfo.name : (row[nameColIdx] ? String(row[nameColIdx]).trim() : "未知名稱");
+                                            const unit = dbInfo ? dbInfo.unit : "PC";
+                                            
+                                            scannedItems.push({ 
+                                                id: window.generateUUID(), 
+                                                code: safeCode, 
+                                                name: name, 
+                                                unit: unit, 
+                                                zone: safeSheetName, 
+                                                initialQty: "", 
+                                                isRandomChecked: false, 
+                                                recountDone: false, 
+                                                randomDone: false, 
+                                                correctionHistory: []
+                                            });
+                                            importedItemsCount++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                window.buildZoneCategoryCache();
+                window.renderQuickZoneButtons(); 
+                syncToFirebase(); 
+                
+                let msg = `✅ Excel 匯入成功！系統已自動依據名稱完成部門分流。\n`;
+                if (shouldImportItems) msg += `共載入 ${importedItemsCount} 項預設商品。\n\n`;
+                
+                msg += `【🛒 超市與美食】共 ${sfmImportedZones.length} 區\n`;
+                if(sfmImportedZones.length > 0) msg += sfmImportedZones.slice(0, 8).join(', ') + (sfmImportedZones.length > 8 ? '...等' : '') + '\n\n';
+                
+                msg += `【🍽️ IKEA 餐廳】共 ${restImportedZones.length} 區\n`;
+                if(restImportedZones.length > 0) msg += restImportedZones.slice(0, 8).join(', ') + (restImportedZones.length > 8 ? '...等' : '');
+                
+                alert(msg);
+                
+                if(!document.getElementById('tab-create').classList.contains('hidden')) { 
+                    window.renderZoneChecklist(); 
+                    window.renderCreateListTable(); 
+                }
+                
+                event.target.value = '';
+
+            } catch (err) {
+                console.error("匯入失敗:", err);
+                alert("⚠️ 讀取 Excel 檔案時發生嚴重錯誤！\n請檢查檔案格式是否損毀，或聯絡管理員。\n系統訊息：" + err.message);
+                event.target.value = '';
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    window.processScan = function() {
+        const codeInput = document.getElementById('itemCodeInput'); 
+        let rawCode = codeInput.value.trim(); 
+        let rawZone = document.getElementById('zoneInput').value.trim();
+        if (!rawZone) { alert("請先在第二步建立或確認『盤點區域』！"); return; }
+        if (!rawCode) return;
+        
+        const zone = rawZone.replace(/[\.#$\[\]\/]/g, '_');
+        const code = rawCode.replace(/[\.#$\[\]\/]/g, '_');
+        
+        knownZones.add(zone); 
+        if(!zoneDepartments[zone]) zoneDepartments[zone] = currentDepartment; 
+        
+        window.buildZoneCategoryCache(); 
+        window.renderQuickZoneButtons(); 
+        
+        if (productDatabase[code]) { 
+            window.addToInventoryList(code, productDatabase[code].name, productDatabase[code].unit, zone); 
+            codeInput.value = ""; 
+        } else { 
+            document.getElementById('manualAddSection').classList.remove('hidden'); 
+            document.getElementById('manualCode').value = code; 
+        }
+    }
+
+    window.saveManualItem = function() {
+        let rawCode = document.getElementById('manualCode').value; 
+        const name = document.getElementById('manualName').value.trim(); 
+        const unit = document.getElementById('manualUnit').value.trim(); 
+        let rawZone = document.getElementById('zoneInput').value.trim();
+        
+        if(!name || !unit) { alert("請完整輸入商品資訊！"); return; }
+        
+        const zone = rawZone.replace(/[\.#$\[\]\/]/g, '_');
+        const code = rawCode.replace(/[\.#$\[\]\/]/g, '_');
+        
+        productDatabase[code] = { name: name, unit: unit }; 
+        window.addToInventoryList(code, name, unit, zone);
+        document.getElementById('manualAddSection').classList.add('hidden'); 
+        document.getElementById('itemCodeInput').value = "";
+    }
+    
+    window.cancelManualItem = function() { document.getElementById('manualAddSection').classList.add('hidden'); }
+
+    window.addToInventoryList = function(code, name, unit, zone, initialQty = "") {
+        scannedItems.push({ id: window.generateUUID(), code: code, name: name, unit: unit, zone: zone, initialQty: initialQty, isRandomChecked: false, recountDone: false, randomDone: false, correctionHistory: [] });
+        syncToFirebase(); window.renderCreateListTable(); window.renderZoneChecklist(); 
+    }
+
+    window.deleteItem = function(itemId) {
+        if(confirm("確定要將這個商品從清單中刪除嗎？")) { scannedItems = scannedItems.filter(item => item.id !== itemId); syncToFirebase(); window.renderCreateListTable(); window.renderZoneChecklist(); }
+    }
+
+    window.renderCreateListTable = function() {
+        const tableBody = document.getElementById('tableBody'); tableBody.innerHTML = "";
+        const currentZone = document.getElementById('zoneInput').value.trim();
+        const filteredItems = currentZone ? scannedItems.filter(item => item.zone === currentZone) : [];
+        const table = document.getElementById('inventoryTable'); const emptyMsg = document.getElementById('emptyTableMsg');
+
+        if (filteredItems.length === 0) { table.classList.add('hidden'); emptyMsg.classList.remove('hidden'); } 
+        else {
+            table.classList.remove('hidden'); emptyMsg.classList.add('hidden');
+            filteredItems.forEach(item => {
+                tableBody.insertAdjacentHTML('beforeend', `<tr><td style="font-weight:700; color:var(--ikea-blue);">${item.zone}</td><td style="font-family:monospace; color:#888;">${item.code}</td><td>${item.name}</td><td style="text-align:center;"><button class="btn btn-outline" style="padding: 6px 12px; font-size: 12px; margin: 0; color:var(--ikea-red); border-color:transparent; background:#fef2f2;" onclick="window.deleteItem('${item.id}')">刪除</button></td></tr>`);
+            });
+        }
+    }
+
+    window.startCameraScanner = async function(mode) {
+        scanMode = mode;
+        const modal = document.getElementById('cameraModal');
+        
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+            await html5QrcodeScanner.stop(); html5QrcodeScanner.clear();
+        }
+
+        modal.classList.remove('hidden');
+        document.getElementById('cameraModalTitle').innerText = mode === 'create' ? "掃描新增商品" : `以掃代打 (${currentCountMode === 'initial' ? '累加初盤' : '覆核比對'})`;
+        
+        setTimeout(() => {
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            
+            const config = {
+                fps: 15, 
+                qrbox: { width: 250, height: 150 }, 
+                formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A ]
+            };
+
+            html5QrcodeScanner.start(
+                { facingMode: "environment" }, 
+                config, 
+                (txt) => { 
+                    if (window.isVerifying) return; 
+                    if (txt === lastScanCode && (Date.now() - lastScanTime) < 1500) return;
+                    lastScanCode = txt; lastScanTime = Date.now(); window.playBeep();
+                    if (scanMode === 'create') { document.getElementById('itemCodeInput').value = txt; window.processScan(); } 
+                    else if (scanMode === 'count') { window.processCountScan(txt); }
+                }, 
+                undefined
+            ).catch((err) => { 
+                console.error("相機啟動失敗:", err);
+                alert("⚠️ 無法開啟相機！\n請確認瀏覽器相機權限是否已開啟。"); 
+                window.stopCameraScanner(); 
+            });
+        }, 300);
+    }
+
+    window.stopCameraScanner = function() { 
+        const modal = document.getElementById('cameraModal');
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) { 
+            html5QrcodeScanner.stop().then(() => { 
+                html5QrcodeScanner.clear();
+                modal.classList.add('hidden'); 
+            }).catch(() => {
+                modal.classList.add('hidden');
+            }); 
+        } else { 
+            if(html5QrcodeScanner) html5QrcodeScanner.clear();
+            modal.classList.add('hidden'); 
+        }
+    }
+
+    window.calculateVerifyDiff = function() {
+        const diffEl = document.getElementById('verifyScanDiff');
+        if (isBlindCountMode) { diffEl.innerText = ''; return; } 
+        
+        const actualInput = document.getElementById('verifyScanActual').value;
+        if (actualInput === '') { diffEl.innerText = ''; return; }
+        
+        const actualQty = parseFloat(actualInput);
+        const expectedQty = parseFloat(document.getElementById('verifyScanExpected').innerText) || 0;
+        const diff = actualQty - expectedQty;
+        
+        if (diff > 0) {
+            diffEl.style.color = 'var(--ikea-blue)'; diffEl.innerText = `差異：+${diff}`;
+        } else if (diff < 0) {
+            diffEl.style.color = 'var(--ikea-red)'; diffEl.innerText = `差異：${diff}`;
+        } else {
+            diffEl.style.color = 'var(--ikea-green)'; diffEl.innerText = `數量相符`;
+        }
+    }
+
+    window.processCountScan = function(code) {
+        let itemsInZone = scannedItems.filter(i => i.zone === currentActiveZone && i.code === code);
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+
+        let item = null;
+        if (itemsInZone.length > 0) {
+            if (currentCountMode === 'initial') {
+                item = itemsInZone.find(i => isUncounted(i.initialQty)) || itemsInZone[0];
+            } else if (currentCountMode === 'recount') {
+                item = itemsInZone.find(i => !isUncounted(i.initialQty) && !i.recountDone) || itemsInZone.find(i => !isUncounted(i.initialQty));
+            } else if (currentCountMode === 'random') {
+                item = itemsInZone.find(i => i.isRandomChecked && !i.randomDone) || itemsInZone.find(i => i.isRandomChecked);
+            }
+        }
+
+        if (item) {
+            if (currentCountMode === 'initial') {
+                item.initialQty = (parseFloat(item.initialQty) || 0) + 1; 
+                item.initialOperator = currentUser;
+                if (!systemStartTime) systemStartTime = Date.now();
+                syncToFirebase(); window.renderZoneItems();
+            } else if (currentCountMode === 'recount' || currentCountMode === 'random') {
+                if (currentCountMode === 'random' && !item.isRandomChecked) {
+                    alert("⚠️ 此商品未列入本次抽盤名單！"); return;
+                }
+                if (isUncounted(item.initialQty)) {
+                    alert("⚠️ 此商品尚未完成初盤，無法進行覆核！請先切換至初盤模式輸入數量。"); return;
+                }
+                
+                window.isVerifying = true; window.verifyItemId = item.id;
+                document.getElementById('verifyScanName').innerText = item.name;
+                
+                if (isBlindCountMode) {
+                    document.getElementById('verifyScanExpectedWrapper').classList.add('hidden');
+                    document.getElementById('verifyScanExpected').innerText = 0; 
+                } else {
+                    document.getElementById('verifyScanExpectedWrapper').classList.remove('hidden');
+                    document.getElementById('verifyScanExpected').innerText = item.initialQty;
+                }
+
+                document.getElementById('verifyScanActual').value = '';
+                document.getElementById('verifyScanDiff').innerText = ''; 
+                document.getElementById('verifyScanModal').classList.remove('hidden');
+            }
+        } else {
+            if (currentCountMode !== 'initial') { alert("⚠️ 覆盤/抽盤模式下，掃描到不在清單內的商品！請切換回初盤模式新增。"); return; }
+            if (productDatabase[code]) {
+                scannedItems.push({ id: window.generateUUID(), code: code, name: productDatabase[code].name, unit: productDatabase[code].unit, zone: currentActiveZone, initialQty: 1, initialOperator: currentUser, isRandomChecked: false, recountDone: false, randomDone: false, correctionHistory: [] });
+                if (!systemStartTime) systemStartTime = Date.now();
+                syncToFirebase(); window.renderZoneItems();
+            } else {
+                window.stopCameraScanner(); document.getElementById('flyCode').value = code; document.getElementById('flyName').value = ''; document.getElementById('flyUnit').value = 'PC'; document.getElementById('flyQty').value = '1'; document.getElementById('onTheFlyModal').classList.remove('hidden');
+            }
+        }
+    }
+
+    window.submitVerifyScan = function() {
+        const actualQty = parseFloat(document.getElementById('verifyScanActual').value);
+        if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的數量！"); return; }
+        
+        const item = scannedItems.find(i => i.id === window.verifyItemId);
+        if (!item) {
+            alert("⚠️ 找不到該商品，可能已被其他裝置刪除，請重新整理後再試。");
+            document.getElementById('verifyScanModal').classList.add('hidden');
+            window.isVerifying = false; return;
+        }
+
+        const expectedQty = parseFloat(item.initialQty) || 0;
+        document.getElementById('verifyScanModal').classList.add('hidden');
+
+        if (actualQty === expectedQty) {
+            if (currentCountMode === 'recount') { item.recountDone = true; item.recountOperator = currentUser; }
+            if (currentCountMode === 'random') { item.randomDone = true; item.randomOperator = currentUser; }
+            syncToFirebase(); window.renderZoneItems();
+            window.isVerifying = false; 
+        } else {
+            if (isBlindCountMode) {
+                alert(`❌ 數量不符！\n\n系統初盤紀錄：${expectedQty}\n本次盲盤輸入：${actualQty}\n\n請重新確認或簽名核准更正。`);
+            } else {
+                alert("❌ 數量不符！請簽名核准更正。");
+            }
+            window.pendingCorrectionQty = actualQty; 
+            window.openSignaturePad(item.id, 'item'); 
+        }
+    }
+
+    window.submitBlindListVerify = function(itemId) {
+        const actualInput = document.getElementById(`blindVerifyInputList-${itemId}`).value;
+        const actualQty = parseFloat(actualInput);
+        if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的數量！"); return; }
+        
+        const item = scannedItems.find(i => i.id === itemId);
+        if (!item) { alert("⚠️ 找不到該商品，可能已被其他裝置刪除，請重新整理後再試。"); return; }
+        
+        const expectedQty = parseFloat(item.initialQty) || 0;
+
+        if (actualQty === expectedQty) {
+            if (currentCountMode === 'recount') { item.recountDone = true; item.recountOperator = currentUser; }
+            if (currentCountMode === 'random') { item.randomDone = true; item.randomOperator = currentUser; }
+            syncToFirebase(); window.renderZoneItems();
+        } else {
+            alert(`❌ 數量不符！\n\n系統初盤紀錄：${expectedQty}\n本次盲盤輸入：${actualQty}\n\n請重新確認或簽名核准更正。`);
+            window.pendingCorrectionQty = actualQty; 
+            window.openSignaturePad(itemId, 'item'); 
+        }
+    }
+
+    window.cancelVerifyScan = function() {
+        document.getElementById('verifyScanModal').classList.add('hidden'); 
+        window.isVerifying = false; 
+    }
+
+    window.handleEnter = function(e, currentId) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const inputs = Array.from(document.querySelectorAll('.initial-section input:not([disabled])'));
+            const currentIndex = inputs.findIndex(input => input.id === `qty-${currentId}`);
+            if (currentIndex > -1) {
+                for (let i = currentIndex + 1; i < inputs.length; i++) {
+                    if (inputs[i].value === '') {
+                        inputs[i].focus();
+                        inputs[i].scrollIntoView({behavior: 'smooth', block: 'center'});
+                        return;
+                    }
+                }
+            }
+            document.activeElement.blur();
+        }
+    }
+
+    window.openZoneDetail = function(zoneName) {
+        currentActiveZone = zoneName; 
+        document.getElementById('currentZoneTitle').innerText = zoneName;
+        document.getElementById('view-zone-list').classList.add('hidden'); 
+        document.getElementById('view-zone-detail').classList.remove('hidden');
+        window.setCountMode('initial'); 
+        window.renderZoneSignatures(); 
+        window.updateHeaderBackButton();
+
+        setTimeout(() => {
+            if (currentCountMode === 'initial') {
+                const firstEmpty = document.querySelector('.initial-section input:not([value]):not([disabled]), .initial-section input[value=""]:not([disabled])');
+                if(firstEmpty) {
+                    firstEmpty.focus();
+                    firstEmpty.scrollIntoView({behavior: 'smooth', block: 'center'});
+                }
+            }
+        }, 150);
+    }
+
+    window.renderZoneSignatures = function() {
+        const status = zoneStatus[currentActiveZone] || {};
+        ['zoneInitial', 'zoneRecount', 'zoneRandom'].forEach(type => {
+            const imgEl = document.getElementById(`sigZone-${type}`);
+            if (status[`sign_${type}`]) { imgEl.src = status[`sign_${type}`]; imgEl.classList.remove('hidden'); } else { imgEl.classList.add('hidden'); }
+        });
+    }
+
+    window.confirmItemCorrect = function(itemId) {
+        const item = scannedItems.find(i => i.id === itemId);
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+        if (item) {
+            if (isUncounted(item.initialQty)) { alert("⚠️ 請先完成初盤數量輸入！"); return; }
+            if (currentCountMode === 'recount') { item.recountDone = true; item.recountOperator = currentUser; }
+            if (currentCountMode === 'random') { item.randomDone = true; item.randomOperator = currentUser; }
+            syncToFirebase(); window.renderZoneItems();
+        }
+    }
+
+    window.renderZoneItems = function() {
+        const container = document.getElementById('inventoryListContainer'); container.innerHTML = ""; let renderedCount = 0;
+        const isUncounted = (val) => val === null || val === undefined || val === "";
+
+        scannedItems.filter(item => item.zone === currentActiveZone).forEach(item => {
+            if ((currentCountMode === 'recount' || currentCountMode === 'random') && isUncounted(item.initialQty)) return;
+            if (currentCountMode === 'random' && !item.isRandomChecked) return;
+            if (currentCountMode === 'recount' && item.recountDone) return;
+            if (currentCountMode === 'random' && item.randomDone) return;
+            renderedCount++;
+
+            let val = !isUncounted(item.initialQty) ? item.initialQty : ""; 
+            let displayVal = val;
+            if (isBlindCountMode && val !== "" && currentCountMode !== 'initial') {
+                displayVal = "***";
+            }
+
+            const isLocked = item.recountDone || item.randomDone || (item.correctionHistory && item.correctionHistory.length > 0);
+            const lockAttr = isLocked ? 'disabled title="已進入覆核/抽盤階段，禁止修改初盤數量"' : '';
+
+            const showInitial = currentCountMode === 'initial' ? '' : 'hidden'; 
+            const showRecount = currentCountMode !== 'initial' ? '' : 'hidden';
+            const rBadge = currentCountMode === 'random' ? `<span style="background: var(--ikea-yellow); color: var(--ikea-dark); font-size: 12px; padding: 4px 8px; border-radius: 6px; margin-left: 8px;">🎯 抽盤</span>` : '';
+            
+            let sigHTML = '';
+            if (item.correctionHistory && item.correctionHistory.length > 0) {
+                const lastCorrection = item.correctionHistory[item.correctionHistory.length - 1];
+                sigHTML = `
+                    <div style="margin-top:12px; font-size:13px; color:var(--ikea-red); font-weight:700;">⚠️ 已更正 ${item.correctionHistory.length} 次，最後簽名：</div>
+                    <img id="sigImage-${item.id}" class="sig-preview" src="${lastCorrection.sign}">
+                `;
+            } else {
+                sigHTML = `<img id="sigImage-${item.id}" class="sig-preview hidden">`;
+            }
+
+            let actionHTML = '';
+            if (isBlindCountMode && currentCountMode !== 'initial') {
+                actionHTML = `
+                    <div id="blindActions-${item.id}" style="margin-top:16px; padding-top:16px; border-top:1px dashed var(--ikea-gray);">
+                        <label style="font-size:14px; font-weight:700; color:var(--ikea-dark); display:block; margin-bottom:8px;">盲盤比對 (請輸入實際數量)：</label>
+                        <input type="number" inputmode="decimal" min="0" step="any" id="blindVerifyInputList-${item.id}" placeholder="輸入數量" style="margin-bottom:12px; width:100%; padding:14px; border:2px solid var(--ikea-gray); border-radius:8px; font-size:18px; text-align:center; background:#fff;">
+                        <button class="btn btn-primary" style="width:100%;" onclick="window.submitBlindListVerify('${item.id}')">確認核對</button>
+                        ${sigHTML}
+                    </div>
+                `;
+            } else {
+                actionHTML = `
+                    <div id="recountActions-${item.id}" style="display:flex; gap:12px;">
+                        <button class="btn btn-success" style="margin-bottom:0;" onclick="window.confirmItemCorrect('${item.id}')">✅ 無誤</button>
+                        <button class="btn btn-outline" style="margin-bottom:0; color:var(--ikea-red); border-color:var(--ikea-gray);" onclick="document.getElementById('errorSection-${item.id}').classList.remove('hidden'); this.parentElement.classList.add('hidden')">❌ 有誤</button>
+                    </div>
+                    <div id="errorSection-${item.id}" class="hidden" style="margin-top:16px; border-top:1px dashed var(--ikea-gray); padding-top:16px;">
+                        <input type="number" inputmode="decimal" min="0" step="any" id="manualVerifyInput-${item.id}" placeholder="正確數量" style="margin-bottom:12px; background:#fff;">
+                        <button class="btn btn-primary" onclick="window.triggerManualCorrection('${item.id}')">✍️ 錯誤更正簽名</button>
+                        ${sigHTML}
+                    </div>
+                `;
+            }
+
+            container.insertAdjacentHTML('beforeend', `
+            <div class="card ${val !== "" ? 'done' : ''}" id="card-${item.id}">
+                <div class="item-title">${item.name} <span style="color:var(--ikea-blue); font-weight:500;">(${item.unit})</span> ${rBadge}</div>
+                <div class="item-code" style="color:var(--ikea-gray-dark); font-family:monospace;">貨號：${item.code}</div>
+                <div class="initial-section ${showInitial}">
+                    <input type="number" inputmode="decimal" pattern="[0-9]*" min="0" step="any" id="qty-${item.id}" value="${val}" placeholder="點擊輸入初盤數量" ${lockAttr} onchange="window.updateQty('${item.id}')" onkeydown="window.handleEnter(event, '${item.id}')">
+                </div>
+                <div class="recount-section ${showRecount}">
+                    <p style="margin-top:0; color:var(--ikea-gray-dark);">初盤數量：<strong style="font-size:24px; color:var(--ikea-blue);">${val === "" ? "未盤" : displayVal}</strong></p>
+                    ${val === "" ? `
+                        <div style="background: #fffbeb; color: #d97706; padding: 12px; border-radius: 8px; border: 1px solid #fde68a; font-weight:500;">
+                            ⚠️ 請先完成初盤數量輸入，才可進行覆核。
+                        </div>
+                    ` : actionHTML}
+                </div>
+            </div>`);
+        });
+
+        if (renderedCount === 0) {
+            const zoneItemsAll = scannedItems.filter(i => i.zone === currentActiveZone);
+            const anyCounted = zoneItemsAll.some(i => !isUncounted(i.initialQty));
+            
+            if (currentCountMode === 'random') {
+                if (zoneItemsAll.some(i => i.isRandomChecked)) {
+                    container.innerHTML = "<div style='text-align:center; background:#eff6ff; color:var(--ikea-blue); padding:24px; border-radius:12px; border:1px solid #dbeafe;'><h3 style='margin:0 0 8px 0;'>🎉 太棒了！</h3><p style='margin:0;'>本區抽盤項目已全數確認完畢。</p></div>";
+                } else {
+                    container.innerHTML = "<p style='text-align:center; color:#94a3b8; padding: 20px;'>本區尚無商品可抽盤。</p>";
+                }
+            } else if (currentCountMode === 'recount') {
+                if (!anyCounted) {
+                    container.innerHTML = "<div style='text-align:center; color:#d97706; background:#fffbeb; padding:24px; border-radius:12px; border:1px solid #fde68a;'><h3 style='margin:0 0 8px 0;'>⏳ 尚未初盤</h3><p style='margin:0;'>本區尚無商品完成初盤，暫無項目可覆盤。</p></div>";
+                } else {
+                    container.innerHTML = "<div style='text-align:center; background:#eff6ff; color:var(--ikea-blue); padding:24px; border-radius:12px; border:1px solid #dbeafe;'><h3 style='margin:0 0 8px 0;'>🎉 太棒了！</h3><p style='margin:0;'>目前已初盤的項目都覆盤完畢了，其餘商品初盤後會自動出現。</p></div>";
+                }
+            } else if (currentCountMode === 'initial') {
+                container.innerHTML = "<p style='text-align:center; color:#94a3b8; padding: 20px;'>本區尚無商品。</p>";
+            }
+        }
+        
+        window.updateModeUI(); 
+    }
+
+    window.triggerManualCorrection = function(itemId) {
+        const inputVal = document.getElementById(`manualVerifyInput-${itemId}`).value;
+        const actualQty = parseFloat(inputVal);
+        if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的正確數量！"); return; }
+        window.pendingCorrectionQty = actualQty;
+        window.isVerifying = true; 
+        window.openSignaturePad(itemId, 'item');
+    }
+
+    window.updateQty = function(itemId, overrideVal = null) {
+        const inputVal = overrideVal !== null ? overrideVal : document.getElementById(`qty-${itemId}`).value;
+        const itemIndex = scannedItems.findIndex(i => i.id === itemId);
+        if(itemIndex > -1) { 
+            scannedItems[itemIndex].initialQty = parseFloat(inputVal) < 0 ? 0 : inputVal; 
+            scannedItems[itemIndex].initialOperator = currentUser; 
+            if (!systemStartTime && inputVal !== "") systemStartTime = Date.now(); 
+            syncToFirebase(); 
+            const card = document.getElementById(`card-${itemId}`); if(card) { if(inputVal !== "") card.classList.add('done'); else card.classList.remove('done'); } 
+            window.updateModeUI(); 
+        }
+    }
+
+    window.setCountMode = function(mode) {
+        if (mode === 'random' && currentActiveZone) {
+            const zoneItems = scannedItems.filter(i => i.zone === currentActiveZone);
+            if (!zoneItems.some(i => i.isRandomChecked) && zoneItems.length > 0) {
+                const pickCount = Math.ceil(zoneItems.length / 3);
+                let selected = [];
+
+                let correctedItems = zoneItems.filter(i => i.correctionHistory && i.correctionHistory.length > 0);
+                selected.push(...correctedItems);
+
+                let remainingItems = zoneItems.filter(i => !selected.includes(i));
+                remainingItems.sort((a, b) => (parseFloat(b.initialQty) || 0) - (parseFloat(a.initialQty) || 0));
+                let highQtyCount = Math.ceil(remainingItems.length * 0.2);
+                selected.push(...remainingItems.splice(0, highQtyCount));
+
+                if (selected.length < pickCount) {
+                    remainingItems.sort(() => 0.5 - Math.random());
+                    selected.push(...remainingItems.slice(0, pickCount - selected.length));
+                } else if (selected.length > pickCount) {
+                    selected = selected.slice(0, pickCount);
+                }
+
+                selected.forEach(target => { const found = scannedItems.find(item => item.id === target.id); if(found) found.isRandomChecked = true; });
+                syncToFirebase(); alert(`🎲 智慧抽盤完成！已優先抽出「曾更正」與「數量大」之品項，共抽出 ${selected.length} 項！`);
+            }
+        }
+        
+        currentCountMode = mode;
+        if(currentActiveZone) window.renderZoneItems();
+        
+        ['Initial', 'Recount', 'Random'].forEach(m => {
+            const btn = document.getElementById(`btnMode${m}`);
+            if(mode.toLowerCase() === m.toLowerCase()) { btn.style.backgroundColor = 'var(--ikea-blue)'; btn.style.color = 'var(--ikea-white)'; btn.style.borderColor = 'var(--ikea-blue)'; } 
+            else { btn.style.backgroundColor = 'transparent'; btn.style.color = '#64748b'; btn.style.borderColor = 'transparent'; }
+        });
+        window.updateModeUI();
+    }
+
+    window.openOnTheFlyModal = function() {
+        document.getElementById('flyCode').value = ''; document.getElementById('flyName').value = ''; document.getElementById('flyUnit').value = 'PC'; document.getElementById('flyQty').value = ''; document.getElementById('onTheFlyModal').classList.remove('hidden');
+    }
+    window.closeOnTheFlyModal = function() { document.getElementById('onTheFlyModal').classList.add('hidden'); }
+    document.getElementById('flyCode').addEventListener('change', function() {
+        const code = this.value.trim(); if(productDatabase[code]) { document.getElementById('flyName').value = productDatabase[code].name; document.getElementById('flyUnit').value = productDatabase[code].unit; }
+    });
+    window.saveOnTheFlyItem = function() {
+        let rawCode = document.getElementById('flyCode').value.trim(); 
+        const name = document.getElementById('flyName').value.trim(); 
+        const unit = document.getElementById('flyUnit').value.trim(); 
+        const qty = document.getElementById('flyQty').value;
+        if(!rawCode || !name || !unit || qty === "") { alert("請完整輸入商品資訊與初盤數量！"); return; }
+        
+        const code = rawCode.replace(/[\.#$\[\]\/]/g, '_');
+        productDatabase[code] = { name: name, unit: unit }; 
+        
+        scannedItems.push({ id: window.generateUUID(), code: code, name: name, unit: unit, zone: currentActiveZone, initialQty: qty, initialOperator: currentUser, isRandomChecked: false, recountDone: false, randomDone: false, correctionHistory: [] });
+        
+        if (!systemStartTime) systemStartTime = Date.now();
+        syncToFirebase();
+        window.closeOnTheFlyModal(); window.renderZoneItems(); alert("✅ 臨時商品已成功加入本盤區！");
+    }
+
+    const canvas = document.getElementById('sigCanvas'); const ctx = canvas.getContext('2d'); let isDrawing = false;
+    window.resizeCanvas = function() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; }; window.addEventListener('resize', window.resizeCanvas); window.resizeCanvas();
+    const handleStart = (e) => { isDrawing=true; ctx.beginPath(); const rect = canvas.getBoundingClientRect(); const cx = e.touches ? e.touches[0].clientX : e.clientX; const cy = e.touches ? e.touches[0].clientY : e.clientY; ctx.moveTo(cx - rect.left, cy - rect.top); };
+    const handleMove = (e) => { if(!isDrawing)return; e.preventDefault(); ctx.lineWidth=3; ctx.lineCap='round'; ctx.strokeStyle='#000'; const rect = canvas.getBoundingClientRect(); const cx = e.touches ? e.touches[0].clientX : e.clientX; const cy = e.touches ? e.touches[0].clientY : e.clientY; ctx.lineTo(cx - rect.left, cy - rect.top); ctx.stroke(); };
+    const handleEnd = () => { isDrawing=false; };
+    canvas.addEventListener('mousedown', handleStart); canvas.addEventListener('mousemove', handleMove); canvas.addEventListener('mouseup', handleEnd); canvas.addEventListener('mouseout', handleEnd);
+    canvas.addEventListener('touchstart', handleStart, {passive:false}); canvas.addEventListener('touchmove', handleMove, {passive:false}); canvas.addEventListener('touchend', handleEnd);
+    window.clearCanvas = function() { 
+        ctx.fillStyle = "#ffffff"; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height); 
+    }
+    
+    window.openSignaturePad = function(targetId, contextType = 'item') { 
+        currentSignContext = { type: contextType, targetId: targetId }; document.getElementById('signatureModal').classList.remove('hidden'); window.resizeCanvas(); window.clearCanvas(); 
+        
+        const savedSig = localStorage.getItem('ikea_default_signature');
+        if (savedSig) {
+            document.getElementById('defaultSignatureSection').classList.remove('hidden');
+        } else {
+            document.getElementById('defaultSignatureSection').classList.add('hidden');
+        }
+    }
+
+    window.useDefaultSignature = function() {
+        const savedSig = localStorage.getItem('ikea_default_signature');
+        if (savedSig) {
+            window.applySignature(savedSig);
+            window.closeSignaturePad();
+        } else {
+            alert("找不到預設簽名，請先手動簽名並儲存！");
+        }
+    }
+    
+    window.closeSignaturePad = function() { 
+        document.getElementById('signatureModal').classList.add('hidden'); 
+        window.isVerifying = false; 
+        window.pendingCorrectionQty = null; 
+    }
+    
+    window.saveSignature = function() { window.applySignature(canvas.toDataURL('image/jpeg', 0.5)); window.closeSignaturePad(); }
+    window.saveAsDefaultSignature = function() { 
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.5); 
+        try { localStorage.setItem('ikea_default_signature', dataUrl); } catch(e){}
+        alert("已存為個人預設簽名！(此設定只保留於本裝置)"); 
+        window.applySignature(dataUrl); window.closeSignaturePad(); 
+    }
+    
+    window.applySignature = function(imgData) { 
+        if (currentSignContext.type === 'item') {
+            const item = scannedItems.find(i => i.id === currentSignContext.targetId);
+            if (item) {
+                if (window.pendingCorrectionQty !== null && window.pendingCorrectionQty !== undefined) {
+                    if (!item.correctionHistory) item.correctionHistory = [];
+                    item.correctionHistory.push({
+                        timestamp: new Date().toLocaleString('zh-TW'),
+                        oldQty: item.initialQty,
+                        newQty: window.pendingCorrectionQty,
+                        mode: currentCountMode,
+                        operator: currentUser,
+                        sign: imgData
+                    });
+                    item.initialQty = window.pendingCorrectionQty;
+                    window.pendingCorrectionQty = null; 
+                }
+                
+                if (currentCountMode === 'recount') { item.recountDone = true; item.recountOperator = currentUser; } 
+                if (currentCountMode === 'random') { item.randomDone = true; item.randomOperator = currentUser; } 
+            }
+            syncToFirebase(); setTimeout(() => { window.renderZoneItems(); }, 500);
+        } else if (currentSignContext.type === 'zone') {
+            const signKey = `sign_${currentSignContext.targetId}`; 
+            if (!zoneStatus[currentActiveZone]) zoneStatus[currentActiveZone] = {};
+            zoneStatus[currentActiveZone][signKey] = imgData; syncToFirebase(); window.renderZoneSignatures(); 
+        }
+    }
+    
+    window.addEventListener('load', function() {
+        if (knownZones.size > 0) window.renderQuickZoneButtons();
+    });
 </script>
 </body>
 </html>
