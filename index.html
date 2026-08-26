@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SFM 完整盤點系統 - 終極防爆與狀態精準版</title>
+    <title>SFM 完整盤點系統 - 多店隔離完整修復版</title>
     
     <!-- 引入 Noto Sans TC 字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -191,6 +191,9 @@
         .issue-icon { font-size: 20px; }
         .issue-content h4 { margin: 0 0 4px 0; font-size: 15px; color: var(--ikea-dark); }
         .issue-content p { margin: 0; font-size: 13px; color: var(--ikea-gray-dark); }
+        /* === 店別選擇彈窗特製設計 === */
+        .store-select-btn { padding: 12px; font-size: 16px; margin-bottom: 0; border-color: #cbd5e1; }
+        .store-select-btn:hover { background-color: var(--ikea-blue); color: white; border-color: var(--ikea-blue); }
     </style>
 </head>
 <body>
@@ -208,6 +211,11 @@
         <div id="tab-home">
             <h2 class="tab-title">🏠 系統首頁</h2>
             <div class="input-group" style="background-color: transparent; border: 1px dashed #cbd5e1;">
+                <!-- 🌟 店別設定區塊 -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
+                    <span style="font-size: 14px; font-weight: 500; color: #475569;">🏪 目前店別：<strong id="displayStoreBranch" style="color:var(--ikea-blue); font-size: 16px;">未設定</strong></span>
+                    <button class="btn btn-outline" style="width: auto; padding: 4px 12px; margin: 0; font-size: 12px; border-radius: 20px;" onclick="window.setStoreBranch()">變更</button>
+                </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 14px; font-weight: 500; color: #475569;">👤 目前操作員：<strong id="displayOperatorName" style="color:var(--ikea-blue); font-size: 16px;">未設定</strong></span>
                     <button class="btn btn-outline" style="width: auto; padding: 4px 12px; margin: 0; font-size: 12px; border-radius: 20px;" onclick="window.setOperatorName()">變更</button>
@@ -403,6 +411,24 @@
         <button class="nav-btn" id="navDashboard" onclick="switchTab('dashboard')"><span style="font-size: 22px; margin-bottom: 2px;">📊</span>總覽</button>
     </div>
 
+    <!-- 🌟 選擇店別彈窗 -->
+    <div id="storeModal" class="modal-overlay hidden" style="z-index: 9999;">
+        <div class="modal-container" style="text-align: center; max-width: 350px;">
+            <h2 style="color: var(--ikea-blue); margin-top: 0;">🏪 選擇店別</h2>
+            <p style="color: var(--ikea-gray-dark); font-size: 14px; margin-bottom: 20px;">請選擇您所在的店別，資料將獨立存放。</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <button class="btn btn-outline store-select-btn" onclick="selectStore('內湖店')">內湖店</button>
+                <button class="btn btn-outline store-select-btn" onclick="selectStore('新莊店')">新莊店</button>
+                <button class="btn btn-outline store-select-btn" onclick="selectStore('新店店')">新店店</button>
+                <button class="btn btn-outline store-select-btn" onclick="selectStore('小巨蛋店')">小巨蛋店</button>
+                <button class="btn btn-outline store-select-btn" onclick="selectStore('青埔店')">青埔店</button>
+                <button class="btn btn-outline store-select-btn" onclick="selectStore('台中店')">台中店</button>
+                <button class="btn btn-outline store-select-btn" onclick="selectStore('高雄店')" style="grid-column: span 2;">高雄店</button>
+            </div>
+            <button id="storeModalCloseBtn" class="btn btn-outline hidden" style="margin-top: 20px; border-color: transparent; color: var(--ikea-gray-dark);" onclick="closeStoreModal()">取消</button>
+        </div>
+    </div>
+
     <!-- 全域相機彈窗 -->
     <div id="cameraModal" class="modal-overlay hidden">
         <div class="modal-container">
@@ -516,6 +542,7 @@
     let sharedAudioCtx = null;
 
     let currentUser = localStorage.getItem('ikea_operator_id') || '';
+    let currentStore = localStorage.getItem('ikea_store_branch') || '';
     let isBlindCountMode = localStorage.getItem('ikea_blind_count') === 'true';
     let selectedZonesForDelete = new Set();
 
@@ -582,12 +609,39 @@
         window.buildZoneCategoryCache(); 
         updateUI();
         document.getElementById('blindCountToggle').checked = isBlindCountMode;
-        if (currentUser) {
-            document.getElementById('displayOperatorName').innerText = currentUser;
+        
+        if (currentStore) {
+            document.getElementById('displayStoreBranch').innerText = currentStore;
+            initFirebaseListeners();
+            if (currentUser) {
+                document.getElementById('displayOperatorName').innerText = currentUser;
+            } else {
+                setTimeout(window.setOperatorName, 800);
+            }
         } else {
-            setTimeout(window.setOperatorName, 800);
+            setTimeout(window.setStoreBranch, 500);
         }
     });
+
+    window.setStoreBranch = function() {
+        document.getElementById('storeModal').classList.remove('hidden');
+        if (currentStore) {
+            document.getElementById('storeModalCloseBtn').classList.remove('hidden');
+        } else {
+            document.getElementById('storeModalCloseBtn').classList.add('hidden');
+        }
+    }
+
+    window.closeStoreModal = function() {
+        document.getElementById('storeModal').classList.add('hidden');
+    }
+
+    window.selectStore = function(store) {
+        currentStore = store;
+        localStorage.setItem('ikea_store_branch', currentStore);
+        alert(`✅ 店別已設定為「${currentStore}」\n系統將為您重新載入專屬資料庫。`);
+        window.location.reload();
+    }
 
     window.setOperatorName = function() {
         const op = prompt("請輸入您的「工號或姓名」\n(此資訊將用於盤點稽核的職責分離紀錄)：", currentUser);
@@ -606,8 +660,7 @@
         if (currentActiveZone) window.renderZoneItems();
     }
 
-    const connectedRef = ref(db, ".info/connected");
-    onValue(connectedRef, (snap) => {
+    onValue(ref(db, ".info/connected"), (snap) => {
         const syncDot = document.querySelector('.sync-dot');
         const syncText = document.getElementById('syncText');
         if (snap.val() === true) {
@@ -617,35 +670,43 @@
         }
     });
 
-    onValue(ref(db, 'sfm_inventory_sync'), (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-            currentInventoryMonth = data.currentInventoryMonth || new Date().toISOString().slice(0, 7);
-            zoneDepartments = data.zoneDepartments || {};
-            productDatabase = data.productDatabase || {};
-            knownZones = new Set(data.knownZones || []);
-            scannedItems = data.scannedItems || [];
-            scannedItems.forEach(item => { if (!item.correctionHistory) item.correctionHistory = []; });
-            zoneStatus = data.zoneStatus || {};
-            systemStartTime = data.systemStartTime || null;
-            savePersistedDataLocalOnly();
-            window.buildZoneCategoryCache(); 
-            updateUI();
-        } else {
-            if (scannedItems.length > 0 || knownZones.size > 0) syncToFirebase(); 
-        }
-        isFirstLoad = false;
-    });
+    // === 🏪 多店分離與 Firebase 連線機制 ===
+    function initFirebaseListeners() {
+        if (!currentStore) return; 
+        
+        const syncRefStr = `sfm_inventory_sync_${currentStore}`;
+        const historyRefStr = `sfm_inventory_history_${currentStore}`;
 
-    onValue(ref(db, 'sfm_inventory_history'), (snapshot) => {
-        if(snapshot.val()) {
-            inventoryHistory = snapshot.val();
-            localStorage.setItem('inventory_history', JSON.stringify(inventoryHistory));
-            if (!document.getElementById('tab-history').classList.contains('hidden') && document.getElementById('historyDetailView').classList.contains('hidden')) {
-                window.renderHistoryList();
+        onValue(ref(db, syncRefStr), (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                currentInventoryMonth = data.currentInventoryMonth || new Date().toISOString().slice(0, 7);
+                zoneDepartments = data.zoneDepartments || {};
+                productDatabase = data.productDatabase || {};
+                knownZones = new Set(data.knownZones || []);
+                scannedItems = data.scannedItems || [];
+                scannedItems.forEach(item => { if (!item.correctionHistory) item.correctionHistory = []; });
+                zoneStatus = data.zoneStatus || {};
+                systemStartTime = data.systemStartTime || null;
+                savePersistedDataLocalOnly();
+                window.buildZoneCategoryCache(); 
+                updateUI();
+            } else {
+                if (scannedItems.length > 0 || knownZones.size > 0) syncToFirebase(); 
             }
-        }
-    });
+            isFirstLoad = false;
+        });
+
+        onValue(ref(db, historyRefStr), (snapshot) => {
+            if(snapshot.val()) {
+                inventoryHistory = snapshot.val();
+                localStorage.setItem('inventory_history', JSON.stringify(inventoryHistory));
+                if (!document.getElementById('tab-history').classList.contains('hidden') && document.getElementById('historyDetailView').classList.contains('hidden')) {
+                    window.renderHistoryList();
+                }
+            }
+        });
+    }
 
     function updateUI() {
         window.updateHeaderMonth();
@@ -707,11 +768,12 @@
 
     function syncToFirebase() {
         savePersistedDataLocalOnly(); 
+        if (!currentStore) return Promise.resolve();
         const syncDot = document.querySelector('.sync-dot'); const syncText = document.getElementById('syncText');
         syncText.innerText = "同步中..."; syncDot.style.backgroundColor = "var(--ikea-yellow)";
 
         let isResolved = false;
-        const syncPromise = set(ref(db, 'sfm_inventory_sync'), {
+        const syncPromise = set(ref(db, `sfm_inventory_sync_${currentStore}`), {
             currentInventoryMonth, zoneDepartments, productDatabase, knownZones: [...knownZones], scannedItems, zoneStatus, systemStartTime
         });
 
@@ -899,7 +961,7 @@
                     document.getElementById('syncText').innerText = "系統還原中...";
                     window.buildZoneCategoryCache();
                     await syncToFirebase();
-                    await set(ref(db, 'sfm_inventory_history'), inventoryHistory);
+                    await set(ref(db, `sfm_inventory_history_${currentStore}`), inventoryHistory);
                     alert("✅ 完整備份還原成功！"); window.location.reload();
                 }
             } catch (err) { alert("檔案格式錯誤，匯入失敗。"); }
@@ -1385,7 +1447,7 @@
                 scannedItems = []; systemStartTime = null; window.buildZoneCategoryCache();
                 for(let z in zoneStatus) { zoneStatus[z] = { isSkipped: false, sign_zoneInitial: null, sign_zoneRecount: null, sign_zoneRandom: null }; }
                 
-                set(ref(db, 'sfm_inventory_history'), inventoryHistory).then(()=>{
+                set(ref(db, `sfm_inventory_history_${currentStore}`), inventoryHistory).then(()=>{
                     syncToFirebase(); window.renderCreateListTable(); alert("✅ 封存成功！系統已重置。");
                 }).catch((err)=>{ alert("⚠️ 封存失敗，已暫存於本機，請檢查網路連線。"); console.error(err); });
             }
@@ -1447,7 +1509,7 @@
         if(confirm("⚠️ 警告：確定要永久刪除這筆歷史紀錄嗎？刪除後無法復原。")) {
             inventoryHistory.splice(index, 1); 
             localStorage.setItem('inventory_history', JSON.stringify(inventoryHistory));
-            set(ref(db, 'sfm_inventory_history'), inventoryHistory)
+            set(ref(db, `sfm_inventory_history_${currentStore}`), inventoryHistory)
                 .then(() => { window.backToHistoryList(); window.renderHistoryList(); })
                 .catch((err) => { alert("⚠️ 刪除失敗，請檢查網路連線後再試一次。"); console.error(err); });
         }
@@ -1463,9 +1525,17 @@
         const file = event.target.files[0]; 
         if (!file) return;
         const shouldImportItems = document.getElementById('importItemsCheckbox').checked;
+
+        const syncText = document.getElementById('syncText');
+        const syncDot = document.querySelector('.sync-dot');
+        const originalText = syncText.innerText;
+        const originalColor = syncDot.style.backgroundColor;
+        syncText.innerText = "⏳ 檔案解析中，請稍候..."; syncDot.style.backgroundColor = "var(--ikea-yellow)";
+
         const reader = new FileReader();
         
         reader.onload = function(e) {
+          setTimeout(() => { // 讓瀏覽器先重繪「解析中」提示，避免使用者以為畫面卡死
             try {
                 const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
                 
@@ -1585,13 +1655,15 @@
                     window.renderCreateListTable(); 
                 }
                 
-                event.target.value = '';
-
             } catch (err) {
                 console.error("匯入失敗:", err);
                 alert("⚠️ 讀取 Excel 檔案時發生嚴重錯誤！\n請檢查檔案格式是否損毀，或聯絡管理員。\n系統訊息：" + err.message);
+            } finally {
                 event.target.value = '';
+                syncText.innerText = originalText;
+                syncDot.style.backgroundColor = originalColor;
             }
+          }, 50);
         };
         reader.readAsArrayBuffer(file);
     }
