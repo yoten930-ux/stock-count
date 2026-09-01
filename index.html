@@ -1547,7 +1547,8 @@
                             const safeCode = rawCode.replace(/[\.#$\[\]\/]/g, '_');
                             productDatabase[safeCode] = { 
                                 name: rows[i][1] ? String(rows[i][1]).trim() : "未知名稱", 
-                                unit: rows[i][2] ? String(rows[i][2]).trim() : "PC" 
+                                unit: rows[i][2] ? String(rows[i][2]).trim() : "PC",
+                                cost: rows[i][5] ? (parseFloat(rows[i][5]) || 0) : 0 // F欄：成本（僅供抽盤排序使用，不在盤點單顯示）
                             };
                         }
                     }
@@ -1582,7 +1583,7 @@
 
                         if (shouldImportItems) {
                             const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[originalSheetName], { header: 1 });
-                            let headerIdx = -1; let itemColIdx = -1; let nameColIdx = -1;
+                            let headerIdx = -1; let itemColIdx = -1; let nameColIdx = -1; let noteColIdx = -1;
                             
                             for (let r = 0; r < sheetData.length; r++) {
                                 if (sheetData[r]) {
@@ -1597,6 +1598,10 @@
                                         nameColIdx = sheetData[r].findIndex(cell => {
                                             if(cell === null || cell === undefined) return false;
                                             return String(cell).includes("品名");
+                                        }); 
+                                        noteColIdx = sheetData[r].findIndex(cell => {
+                                            if(cell === null || cell === undefined) return false;
+                                            return String(cell).includes("備註");
                                         }); 
                                         break; 
                                     }
@@ -1613,6 +1618,7 @@
                                             const dbInfo = productDatabase[safeCode];
                                             const name = dbInfo ? dbInfo.name : (row[nameColIdx] ? String(row[nameColIdx]).trim() : "未知名稱");
                                             const unit = dbInfo ? dbInfo.unit : "PC";
+                                            const note = (noteColIdx !== -1 && row[noteColIdx]) ? String(row[noteColIdx]).trim() : "";
                                             
                                             scannedItems.push({ 
                                                 id: window.generateUUID(), 
@@ -1624,7 +1630,8 @@
                                                 isRandomChecked: false, 
                                                 recountDone: false, 
                                                 randomDone: false, 
-                                                correctionHistory: []
+                                                correctionHistory: [],
+                                                note: note
                                             });
                                             importedItemsCount++;
                                         }
@@ -2038,10 +2045,13 @@
                 `;
             }
 
+            const noteHTML = item.note ? `<div style="margin-top:6px; padding:6px 10px; background:#fff1f2; border-left:3px solid #e11d48; border-radius:4px; color:#be123c; font-size:13px; font-weight:600;">📌 提醒：${item.note}</div>` : '';
+
             container.insertAdjacentHTML('beforeend', `
             <div class="card ${val !== "" ? 'done' : ''}" id="card-${item.id}">
                 <div class="item-title">${item.name} <span style="color:var(--ikea-blue); font-weight:500;">(${item.unit})</span> ${rBadge}</div>
                 <div class="item-code" style="color:var(--ikea-gray-dark); font-family:monospace;">貨號：${item.code}</div>
+                ${noteHTML}
                 <div class="initial-section ${showInitial}">
                     <input type="number" inputmode="decimal" pattern="[0-9]*" min="0" step="any" id="qty-${item.id}" value="${val}" placeholder="點擊輸入初盤數量" ${lockAttr} onchange="window.updateQty('${item.id}')" onkeydown="window.handleEnter(event, '${item.id}')">
                 </div>
@@ -2107,25 +2117,25 @@
             const zoneItems = scannedItems.filter(i => i.zone === currentActiveZone);
             if (!zoneItems.some(i => i.isRandomChecked) && zoneItems.length > 0) {
                 const pickCount = Math.ceil(zoneItems.length / 3);
-                let selected = [];
 
-                let correctedItems = zoneItems.filter(i => i.correctionHistory && i.correctionHistory.length > 0);
-                selected.push(...correctedItems);
+                // 依優先序排序：① 成本高 → ② 初/複盤曾有異常更正 → ③ 盤點數量大
+                const sortedItems = [...zoneItems].sort((a, b) => {
+                    const costA = (productDatabase[a.code] && productDatabase[a.code].cost) || 0;
+                    const costB = (productDatabase[b.code] && productDatabase[b.code].cost) || 0;
+                    if (costA !== costB) return costB - costA;
 
-                let remainingItems = zoneItems.filter(i => !selected.includes(i));
-                remainingItems.sort((a, b) => (parseFloat(b.initialQty) || 0) - (parseFloat(a.initialQty) || 0));
-                let highQtyCount = Math.ceil(remainingItems.length * 0.2);
-                selected.push(...remainingItems.splice(0, highQtyCount));
+                    const correctedA = (a.correctionHistory && a.correctionHistory.length > 0) ? 1 : 0;
+                    const correctedB = (b.correctionHistory && b.correctionHistory.length > 0) ? 1 : 0;
+                    if (correctedA !== correctedB) return correctedB - correctedA;
 
-                if (selected.length < pickCount) {
-                    remainingItems.sort(() => 0.5 - Math.random());
-                    selected.push(...remainingItems.slice(0, pickCount - selected.length));
-                } else if (selected.length > pickCount) {
-                    selected = selected.slice(0, pickCount);
-                }
+                    const qtyA = parseFloat(a.initialQty) || 0;
+                    const qtyB = parseFloat(b.initialQty) || 0;
+                    return qtyB - qtyA;
+                });
 
+                const selected = sortedItems.slice(0, pickCount);
                 selected.forEach(target => { const found = scannedItems.find(item => item.id === target.id); if(found) found.isRandomChecked = true; });
-                syncToFirebase(); alert(`🎲 智慧抽盤完成！已優先抽出「曾更正」與「數量大」之品項，共抽出 ${selected.length} 項！`);
+                syncToFirebase(); alert(`🎲 智慧抽盤完成！已依「成本高 > 曾異常更正 > 數量大」優先序抽出 ${selected.length} 項！`);
             }
         }
         
