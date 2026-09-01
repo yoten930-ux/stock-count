@@ -1891,11 +1891,13 @@
         document.getElementById('verifyScanModal').classList.add('hidden');
 
         if (actualQty === expectedQty) {
+            if (!checkOperatorSeparation(item, currentCountMode)) { window.isVerifying = false; return; }
             if (currentCountMode === 'recount') { item.recountDone = true; item.recountOperator = currentUser; }
             if (currentCountMode === 'random') { item.randomDone = true; item.randomOperator = currentUser; }
             syncToFirebase(); window.renderZoneItems();
             window.isVerifying = false; 
         } else {
+            if (!checkOperatorSeparation(item, currentCountMode)) { window.isVerifying = false; return; }
             if (isBlindCountMode) {
                 alert(`❌ 數量不符！\n\n系統初盤紀錄：${expectedQty}\n本次盲盤輸入：${actualQty}\n\n請重新確認或簽名核准更正。`);
             } else {
@@ -1917,10 +1919,12 @@
         const expectedQty = parseFloat(item.initialQty) || 0;
 
         if (actualQty === expectedQty) {
+            if (!checkOperatorSeparation(item, currentCountMode)) return;
             if (currentCountMode === 'recount') { item.recountDone = true; item.recountOperator = currentUser; }
             if (currentCountMode === 'random') { item.randomDone = true; item.randomOperator = currentUser; }
             syncToFirebase(); window.renderZoneItems();
         } else {
+            if (!checkOperatorSeparation(item, currentCountMode)) return;
             alert(`❌ 數量不符！\n\n系統初盤紀錄：${expectedQty}\n本次盲盤輸入：${actualQty}\n\n請重新確認或簽名核准更正。`);
             window.pendingCorrectionQty = actualQty; 
             window.openSignaturePad(itemId, 'item'); 
@@ -1978,11 +1982,33 @@
         });
     }
 
+    // === 🔒 職責分離檢查：確保初盤／覆盤／抽盤不會是同一人 ===
+    function checkOperatorSeparation(item, mode) {
+        if (!currentUser) return true; // 尚未設定操作員姓名時，無從比對，不擋
+        if (mode === 'recount') {
+            if (item.initialOperator && item.initialOperator === currentUser) {
+                alert(`⚠️ 職責分離限制：初盤與覆盤不可為同一人！\n\n此商品初盤人員為「${item.initialOperator}」，請更換操作員後再進行覆盤。`);
+                return false;
+            }
+        } else if (mode === 'random') {
+            if (item.initialOperator && item.initialOperator === currentUser) {
+                alert(`⚠️ 職責分離限制：初盤與抽盤不可為同一人！\n\n此商品初盤人員為「${item.initialOperator}」，請更換操作員後再進行抽盤。`);
+                return false;
+            }
+            if (item.recountOperator && item.recountOperator === currentUser) {
+                alert(`⚠️ 職責分離限制：覆盤與抽盤不可為同一人！\n\n此商品覆盤人員為「${item.recountOperator}」，請更換操作員後再進行抽盤。`);
+                return false;
+            }
+        }
+        return true;
+    }
+
     window.confirmItemCorrect = function(itemId) {
         const item = scannedItems.find(i => i.id === itemId);
         const isUncounted = (val) => val === null || val === undefined || val === "";
         if (item) {
             if (isUncounted(item.initialQty)) { alert("⚠️ 請先完成初盤數量輸入！"); return; }
+            if (!checkOperatorSeparation(item, currentCountMode)) return;
             if (currentCountMode === 'recount') { item.recountDone = true; item.recountOperator = currentUser; }
             if (currentCountMode === 'random') { item.randomDone = true; item.randomOperator = currentUser; }
             syncToFirebase(); window.renderZoneItems();
@@ -2097,6 +2123,8 @@
         const inputVal = document.getElementById(`manualVerifyInput-${itemId}`).value;
         const actualQty = parseFloat(inputVal);
         if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的正確數量！"); return; }
+        const item = scannedItems.find(i => i.id === itemId);
+        if (item && !checkOperatorSeparation(item, currentCountMode)) return;
         window.pendingCorrectionQty = actualQty;
         window.isVerifying = true; 
         window.openSignaturePad(itemId, 'item');
