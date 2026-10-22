@@ -1524,7 +1524,7 @@
         window.updateHeaderBackButton();
     }
 
-    window.handleFileUpload = function(event) {
+window.handleFileUpload = function(event) {
         const file = event.target.files[0]; 
         if (!file) return;
         const shouldImportItems = document.getElementById('importItemsCheckbox').checked;
@@ -1542,8 +1542,10 @@
             try {
                 const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
                 
-                if (workbook.Sheets['SETTING']) {
-                    const rows = XLSX.utils.sheet_to_json(workbook.Sheets['SETTING'], { header: 1 });
+                // 🌟 修改 1：忽略大小寫尋找 SETTING 工作表
+                const settingSheetName = workbook.SheetNames.find(n => n.toUpperCase() === 'SETTING');
+                if (settingSheetName && workbook.Sheets[settingSheetName]) {
+                    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[settingSheetName], { header: 1 });
                     for (let i = 1; i < rows.length; i++) {
                         if (rows[i] && rows[i].length > 0 && rows[i][0]) {
                             const rawCode = String(rows[i][0]).trim();
@@ -1551,7 +1553,7 @@
                             productDatabase[safeCode] = { 
                                 name: rows[i][1] ? String(rows[i][1]).trim() : "未知名稱", 
                                 unit: rows[i][2] ? String(rows[i][2]).trim() : "PC",
-                                cost: rows[i][5] ? (parseFloat(rows[i][5]) || 0) : 0 // F欄：成本（僅供抽盤排序使用，不在盤點單顯示）
+                                cost: rows[i][5] ? (parseFloat(rows[i][5]) || 0) : 0 // F欄：成本
                             };
                         }
                     }
@@ -1562,7 +1564,10 @@
                 let restImportedZones = [];
 
                 workbook.SheetNames.forEach(originalSheetName => {
-                    if (!['SETTING', 'display bin', '工作表1'].includes(originalSheetName)) {
+                    const lowerSheetName = String(originalSheetName).toLowerCase();
+                    
+                    // 🌟 修改 2：排除特定系統用分頁 (包含小寫的 setting)
+                    if (!['setting', 'display bin', '工作表1', '工作表2'].includes(lowerSheetName)) {
                         
                         const safeSheetName = String(originalSheetName).replace(/[\.#$\[\]\/]/g, '_');
                         let targetDept = currentDepartment;
@@ -1590,18 +1595,21 @@
                             
                             for (let r = 0; r < sheetData.length; r++) {
                                 if (sheetData[r]) {
-                                    const rowStr = sheetData[r].join("");
-                                    if (rowStr.includes("貨號") || rowStr.includes("編號") || rowStr.includes("條碼") || rowStr.includes("品名")) { 
+                                    // 🌟 修改 3：嚴格雙重驗證：必須同時找到「貨號/條碼」與「品名」，才認定為標題列
+                                    let tempItemIdx = sheetData[r].findIndex(cell => { 
+                                        if(cell === null || cell === undefined) return false;
+                                        const s = String(cell); 
+                                        return s.includes("貨號") || s.includes("編號") || s.includes("條碼"); 
+                                    }); 
+                                    let tempNameIdx = sheetData[r].findIndex(cell => {
+                                        if(cell === null || cell === undefined) return false;
+                                        return String(cell).includes("品名") || String(cell).includes("名稱");
+                                    }); 
+                                    
+                                    if (tempItemIdx !== -1 && tempNameIdx !== -1) { 
                                         headerIdx = r; 
-                                        itemColIdx = sheetData[r].findIndex(cell => { 
-                                            if(cell === null || cell === undefined) return false;
-                                            const s = String(cell); 
-                                            return s.includes("貨號") || s.includes("編號") || s.includes("條碼"); 
-                                        }); 
-                                        nameColIdx = sheetData[r].findIndex(cell => {
-                                            if(cell === null || cell === undefined) return false;
-                                            return String(cell).includes("品名");
-                                        }); 
+                                        itemColIdx = tempItemIdx;
+                                        nameColIdx = tempNameIdx;
                                         noteColIdx = sheetData[r].findIndex(cell => {
                                             if(cell === null || cell === undefined) return false;
                                             return String(cell).includes("備註");
