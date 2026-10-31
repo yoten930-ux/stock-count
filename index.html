@@ -584,7 +584,8 @@
     window.getZoneCategory = function(zoneName) { return window.zoneCategoryCache[zoneName] || '其他'; }
 
     window.getZoneStatusDetails = function(z) {
-        const itemsInZone = scannedItems.filter(i => i.zone === z);
+        let safeItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
+        const itemsInZone = safeItems.filter(i => i.zone === z);
         const zStat = zoneStatus[z] || {};
         if (itemsInZone.length === 0) return { label: '空盤區', class: 'zone-badge-grey', code: 'empty' };
         
@@ -600,6 +601,8 @@
         if (!zStat.sign_zoneRecount) return { label: '待覆盤簽名', class: 'zone-badge-blue', code: 'pending_recount_sign' };
         
         const randomItems = itemsInZone.filter(i => i.isRandomChecked);
+        if (randomItems.length === 0) return { label: '待抽盤', class: 'zone-badge-purple', code: 'pending_random' };
+        
         const unRandomed = randomItems.filter(i => !i.randomDone).length;
         if (unRandomed > 0) return { label: '待抽盤', class: 'zone-badge-purple', code: 'pending_random' };
         if (!zStat.sign_zoneRandom) return { label: '待抽盤簽名', class: 'zone-badge-purple', code: 'pending_random_sign' };
@@ -658,8 +661,18 @@
     }
 
     window.toggleBlindCount = function() {
-        isBlindCountMode = document.getElementById('blindCountToggle').checked;
+        const toggleEl = document.getElementById('blindCountToggle');
+        const newVal = toggleEl.checked;
+        const label = newVal ? '開啟' : '關閉';
+        if (!confirm(`盲盤模式為「全店共用」設定，${label}後所有裝置都會同步${label}。\n\n確定要${label}盲盤模式嗎？`)) { toggleEl.checked = !newVal; return; }
+        isBlindCountMode = newVal;
         localStorage.setItem('ikea_blind_count', isBlindCountMode);
+        if (currentStore) {
+            try {
+                update(ref(db, `sfm_inventory_sync_${currentStore}`), { isBlindCountMode: isBlindCountMode })
+                    .catch(err => { console.error("盲盤設定同步失敗:", err); alert("⚠️ 盲盤設定同步失敗，目前僅套用在這支裝置。"); });
+            } catch (e) { console.error("盲盤設定同步失敗:", e); }
+        }
         if (currentActiveZone) window.renderZoneItems();
     }
 
@@ -673,9 +686,6 @@
         }
     });
 
-    // === 🏪 多店分離與 Firebase 連線機制 ===
-    // >>> SYNC-DIFF-BEGIN
-    // === 🔄 差異式同步：只寫入「有變動的項目」，避免多人同時操作時互相覆蓋 ===
     let remoteSnap = { loaded: false, itemsLegacy: false, zonesLegacy: false, items: {}, zoneStatus: {}, zoneDepartments: {}, productDatabase: {}, knownZones: {}, month: null, start: null };
     let seqCounter = 0;
     function nextSeq() { seqCounter = (seqCounter + 1) % 1000; return Date.now() * 1000 + seqCounter; }
@@ -685,8 +695,8 @@
         if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
         const keys = Object.keys(v).sort().filter(k => {
             const x = v[k];
-            if (x === null || x === undefined) return false;                          // Firebase 不存 null
-            if (Array.isArray(x) && x.length === 0) return false;                      // 也不存空陣列
+            if (x === null || x === undefined) return false;                          
+            if (Array.isArray(x) && x.length === 0) return false;                      
             if (typeof x === 'object' && !Array.isArray(x) && Object.keys(x).length === 0) return false;
             return true;
         });
@@ -714,26 +724,24 @@
         const updates = {};
         if ((local.month ?? null) !== snap.month) updates['currentInventoryMonth'] = local.month ?? null;
         if ((local.start ?? null) !== snap.start) updates['systemStartTime'] = local.start ?? null;
+        if (local.isBlindCountMode !== undefined) updates['isBlindCountMode'] = local.isBlindCountMode;
 
-        // 商品：每一筆各自一個路徑（以 id 為 key）
         local.items.forEach(it => { if (it.seq === undefined || it.seq === null) it.seq = nextSeq(); });
         const localMap = {}; local.items.forEach(it => { localMap[it.id] = it; });
         if (snap.itemsLegacy) {
             const whole = {}; local.items.forEach(it => { whole[it.id] = cleanForFirebase(it); });
-            updates['scannedItems'] = Object.keys(whole).length ? whole : null;   // 舊格式(陣列)一次性轉換
+            updates['scannedItems'] = Object.keys(whole).length ? whole : null;
         } else {
             Object.keys(localMap).forEach(id => { if (snap.items[id] !== stableStringify(localMap[id])) updates['scannedItems/' + id] = cleanForFirebase(localMap[id]); });
             Object.keys(snap.items).forEach(id => { if (!(id in localMap)) updates['scannedItems/' + id] = null; });
         }
 
-        // 以名稱為 key 的資料：逐筆比對
         ['zoneStatus', 'zoneDepartments', 'productDatabase'].forEach(name => {
             const lm = local[name] || {}; const sm = snap[name] || {};
             Object.keys(lm).forEach(k => { if (k && sm[k] !== stableStringify(lm[k])) updates[name + '/' + k] = cleanForFirebase(lm[k]); });
             Object.keys(sm).forEach(k => { if (!(k in lm)) updates[name + '/' + k] = null; });
         });
 
-        // 盤區清單
         const lz = [...local.knownZones].filter(z => z);
         if (snap.zonesLegacy) { const o = {}; lz.forEach(z => { o[z] = true; }); updates['knownZones'] = lz.length ? o : null; }
         else {
@@ -742,9 +750,7 @@
         }
         return updates;
     }
-    // <<< SYNC-DIFF-END
 
-    // === ⌨️ 輸入中不重繪：避免別人同步進來時，把正在輸入的數字洗掉 ===
     let uiRenderDeferred = false;
     function isEditingListInput() {
         const ae = document.activeElement;
@@ -771,15 +777,26 @@
                 productDatabase = data.productDatabase || {};
                 const zoneList = Array.isArray(data.knownZones) ? data.knownZones.filter(Boolean) : Object.keys(data.knownZones || {});
                 knownZones = new Set(zoneList);
+                
                 let itemList;
-                if (Array.isArray(data.scannedItems)) itemList = data.scannedItems.filter(Boolean).map((it, i) => { if (it.seq === undefined) it.seq = i + 1; return it; });  // 舊格式
+                if (Array.isArray(data.scannedItems)) itemList = data.scannedItems.filter(Boolean).map((it, i) => { if (it.seq === undefined) it.seq = i + 1; return it; }); 
                 else if (data.scannedItems && typeof data.scannedItems === 'object') itemList = Object.values(data.scannedItems);
                 else itemList = [];
+                
                 itemList.sort((a, b) => (a.seq || 0) - (b.seq || 0));
                 itemList.forEach(item => { if (!item.correctionHistory) item.correctionHistory = []; });
                 scannedItems = itemList;
+                
                 zoneStatus = data.zoneStatus || {};
                 systemStartTime = data.systemStartTime || null;
+                
+                if (data.isBlindCountMode !== undefined && data.isBlindCountMode !== null) { 
+                    isBlindCountMode = (data.isBlindCountMode === true);
+                    localStorage.setItem('ikea_blind_count', isBlindCountMode);
+                    const blindEl = document.getElementById('blindCountToggle');
+                    if (blindEl) blindEl.checked = isBlindCountMode;
+                }
+                
                 captureRemoteSnap(data, itemList, zoneList);
                 savePersistedDataLocalOnly();
                 window.buildZoneCategoryCache(); 
@@ -793,7 +810,8 @@
 
         onValue(ref(db, historyRefStr), (snapshot) => {
             if(snapshot.val()) {
-                inventoryHistory = snapshot.val();
+                let rawHistory = snapshot.val();
+                inventoryHistory = Array.isArray(rawHistory) ? rawHistory : Object.values(rawHistory);
                 localStorage.setItem('inventory_history', JSON.stringify(inventoryHistory));
                 if (!document.getElementById('tab-history').classList.contains('hidden') && document.getElementById('historyDetailView').classList.contains('hidden')) {
                     window.renderHistoryList();
@@ -806,6 +824,7 @@
         window.updateHeaderMonth();
         if (!isFirstLoad) {
             if (isEditingListInput()) { uiRenderDeferred = true; return; }
+            
             if (!document.getElementById('tab-create').classList.contains('hidden')) { window.renderZoneChecklist(); window.renderCreateListTable(); window.renderQuickZoneButtons(); }
             if (!document.getElementById('tab-count').classList.contains('hidden')) {
                 if (currentActiveZone) { window.renderZoneItems(); window.renderZoneSignatures(); } else { window.renderZoneDashboard(); }
@@ -865,24 +884,24 @@
         savePersistedDataLocalOnly(); 
         if (!currentStore) return Promise.resolve();
         const syncDot = document.querySelector('.sync-dot'); const syncText = document.getElementById('syncText');
-        if (!remoteSnap.loaded) { syncText.innerText = "等待雲端資料載入…"; return Promise.resolve(); } // 尚未取得雲端現況前不寫入，避免用不完整資料覆蓋別人
+        if (!remoteSnap.loaded) { syncText.innerText = "等待雲端資料載入…"; return Promise.resolve(); }
 
         let updates;
         try {
-            updates = buildSyncUpdates({ month: currentInventoryMonth, start: systemStartTime, items: scannedItems, zoneStatus, zoneDepartments, productDatabase, knownZones }, remoteSnap);
+            updates = buildSyncUpdates({ month: currentInventoryMonth, start: systemStartTime, items: scannedItems, zoneStatus, zoneDepartments, productDatabase, knownZones, isBlindCountMode }, remoteSnap);
         } catch (e) {
             console.error("同步資料整理失敗:", e);
             syncText.innerText = "⚠️ 資料格式錯誤"; syncDot.style.backgroundColor = "var(--ikea-red)";
             return Promise.resolve();
         }
-        if (Object.keys(updates).length === 0) return Promise.resolve();   // 沒有變動就不寫入
+        if (Object.keys(updates).length === 0) return Promise.resolve(); 
 
         syncText.innerText = "同步中..."; syncDot.style.backgroundColor = "var(--ikea-yellow)";
 
         let isResolved = false;
         let syncPromise;
         try {
-            syncPromise = update(ref(db, `sfm_inventory_sync_${currentStore}`), updates);   // 只寫入有變動的路徑
+            syncPromise = update(ref(db, `sfm_inventory_sync_${currentStore}`), updates); 
         } catch (e) {
             console.error("同步寫入失敗:", e);
             syncText.innerText = "⚠️ 資料格式錯誤"; syncDot.style.backgroundColor = "var(--ikea-red)";
@@ -977,6 +996,7 @@
         const zoneToDelete = currentActiveZone; 
         
         if (confirm(`⚠️ 警告：確定要刪除整個盤區「${zoneToDelete}」嗎？\n裡面的所有商品資料也將一併被清空，此操作無法復原！`)) {
+            scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
             scannedItems = scannedItems.filter(item => item.zone !== zoneToDelete);
             knownZones.delete(zoneToDelete);
             delete zoneStatus[zoneToDelete];
@@ -1029,6 +1049,7 @@
         
         const zonesToDelete = [...selectedZonesForDelete];
         if (confirm(`⚠️ 警告：確定要刪除選取的 ${zonesToDelete.length} 個盤區嗎？\n裡面的所有商品資料也將一併被清空，此操作無法復原！`)) {
+            scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
             zonesToDelete.forEach(zone => {
                 scannedItems = scannedItems.filter(item => item.zone !== zone);
                 knownZones.delete(zone);
@@ -1067,8 +1088,18 @@
                 if (confirm("⚠️ 警告：即將匯入系統備份檔，此操作將【完全覆蓋】目前的雲端資料！確定要繼續嗎？")) {
                     currentInventoryMonth = importedData.currentInventoryMonth || new Date().toISOString().slice(0, 7);
                     zoneDepartments = importedData.zoneDepartments || {}; productDatabase = importedData.productDatabase || {};
-                    knownZones = new Set(importedData.knownZones || []); scannedItems = importedData.scannedItems || [];
-                    zoneStatus = importedData.zoneStatus || {}; inventoryHistory = importedData.inventoryHistory || [];
+                    
+                    let rawZones = importedData.knownZones || [];
+                    knownZones = new Set(Array.isArray(rawZones) ? rawZones : Object.values(rawZones));
+                    
+                    let rawItems = importedData.scannedItems || [];
+                    scannedItems = Array.isArray(rawItems) ? rawItems : Object.values(rawItems);
+                    
+                    zoneStatus = importedData.zoneStatus || {}; 
+                    
+                    let rawHistory = importedData.inventoryHistory || [];
+                    inventoryHistory = Array.isArray(rawHistory) ? rawHistory : Object.values(rawHistory);
+                    
                     systemStartTime = importedData.systemStartTime || null;
                     document.getElementById('syncText').innerText = "系統還原中...";
                     window.buildZoneCategoryCache();
@@ -1201,441 +1232,17 @@
 
     window.updateCustomZone = function() { window.renderCreateListTable(); }
 
-    window.renderZoneChecklist = function() {
-        const deptZones = [...knownZones].filter(z => (zoneDepartments[z] || 'SFM') === currentDepartment);
-        const zonesArray = window.sortZones(deptZones); 
-        window.renderTabs(zonesArray, 'checklistTabsContainer', activeChecklistCategory, 'setChecklistCategory');
-
-        const container = document.getElementById('zoneChecklistContainer'); const statusContainer = document.getElementById('checklistOverallStatus');
-        if (zonesArray.length === 0) { container.innerHTML = "<p style='text-align:center; color:#94a3b8; padding: 20px;'>本部門尚未建立任何盤區。</p>"; statusContainer.innerHTML = ""; return; }
-
-        if (activeChecklistCategory === '全部') {
-            let readyZonesCount = 0;
-            zonesArray.forEach(z => {
-                const hasItems = scannedItems.some(item => item.zone === z);
-                if (hasItems || (zoneStatus[z] && zoneStatus[z].isSkipped)) readyZonesCount++;
-            });
-            if (readyZonesCount === zonesArray.length) { statusContainer.innerHTML = `<div class="overall-status overall-complete">✅ 本部門盤單已全部完成 (${readyZonesCount}/${zonesArray.length})</div>`; } 
-            else { statusContainer.innerHTML = `<div class="overall-status overall-pending">⏳ 盤單製作未完成 (${readyZonesCount}/${zonesArray.length} 區)</div>`; }
-        } else { statusContainer.innerHTML = ""; }
-
-        let filteredZones = activeChecklistCategory !== '全部' ? zonesArray.filter(z => window.getZoneCategory(z) === activeChecklistCategory) : zonesArray;
-        if (filteredZones.length === 0) { container.innerHTML = `<p style='text-align:center; color:#94a3b8; padding: 20px;'>此分類下無盤區。</p>`; return; }
-
-        let html = '<div class="table-wrapper"><table class="checklist-table"><thead><tr><th style="width:40px; text-align:center;"><input type="checkbox" id="selectAllZones" style="width:18px; height:18px; accent-color:var(--ikea-blue); cursor:pointer;" onclick="window.toggleAllZones(this)"></th><th>盤區名稱</th><th>進度狀態</th><th>操作</th></tr></thead><tbody>';
-        filteredZones.forEach(zone => {
-            if (!zoneStatus[zone]) zoneStatus[zone] = { isSkipped: false, sign_zoneInitial: null, sign_zoneRecount: null, sign_zoneRandom: null };
-            
-            let statusBadge = ""; let actionBtn = "";
-            if (zoneStatus[zone].isSkipped) { 
-                statusBadge = '<span class="status-badge status-grey">⚪ 不盤點</span>'; 
-                actionBtn = `<button class="btn btn-outline" style="padding:4px 12px; font-size:12px; margin:0;" onclick="window.toggleZoneSkip('${zone}')">恢復</button>`; 
-            } else {
-                const statInfo = window.getZoneStatusDetails(zone);
-                statusBadge = `<span class="${statInfo.class}">${statInfo.label}</span>`;
-                actionBtn = `<button class="btn" style="background:#f1f5f9; border: 1px solid #cbd5e1; padding:4px 12px; font-size:12px; margin:0; color:#475569;" onclick="window.toggleZoneSkip('${zone}')">設為不盤</button>`;
-            }
-            
-            let isChecked = selectedZonesForDelete.has(zone) ? 'checked' : '';
-            html += `<tr><td style="text-align:center;"><input type="checkbox" class="zone-checkbox" value="${zone}" ${isChecked} onchange="window.toggleZoneSelection('${zone}', this.checked)" style="width:18px; height:18px; accent-color:var(--ikea-blue); margin:0; cursor:pointer;"></td><td style="font-weight:700; color:var(--ikea-blue); cursor:pointer;" onclick="window.jumpToZone('${zone}')">${zone}</td><td>${statusBadge}</td><td>${actionBtn}</td></tr>`;
-        });
-        html += '</tbody></table></div>'; container.innerHTML = html;
-        savePersistedDataLocalOnly(); 
-        window.updateBulkDeleteButton();
-    }
-
-    window.toggleZoneSkip = function(zone) { if (zoneStatus[zone]) { zoneStatus[zone].isSkipped = !zoneStatus[zone].isSkipped; syncToFirebase(); window.renderZoneChecklist(); } }
-
-    window.setDashboardCategory = function(category) { activeDashboardCategory = category; window.renderZoneDashboard(); }
-    
-    window.backToZoneList = function() { 
-        currentActiveZone = null; 
-        document.getElementById('view-zone-detail').classList.add('hidden'); 
-        document.getElementById('view-zone-list').classList.remove('hidden'); 
-        window.renderZoneDashboard(); 
-        window.updateHeaderBackButton();
-    }
-
-    window.checkZoneDone = function(z) {
-        const itemsInZone = scannedItems.filter(i => i.zone === z); if (itemsInZone.length === 0) return false;
-        const isUncounted = (val) => val === null || val === undefined || val === "";
-        const allItemsCounted = itemsInZone.every(i => !isUncounted(i.initialQty));
-        const allRecountsDone = itemsInZone.every(i => i.recountDone);
-        const randomItems = itemsInZone.filter(i => i.isRandomChecked);
-        const allRandomsDone = randomItems.length === 0 || randomItems.every(i => i.randomDone);
-        const zStat = zoneStatus[z] || {}; const hasAllSigns = !!zStat.sign_zoneInitial && !!zStat.sign_zoneRecount && !!zStat.sign_zoneRandom;
-        if (allItemsCounted && allRecountsDone && allRandomsDone && hasAllSigns) {
-            if (!zoneStatus[z].completedAt) { zoneStatus[z].completedAt = Date.now(); syncToFirebase(); }
-            return true;
-        }
-        return false;
-    }
-
-    window.updateModeUI = function() {
-        if (!currentActiveZone) return;
-        const zoneItems = scannedItems.filter(i => i.zone === currentActiveZone);
-        const isUncounted = (val) => val === null || val === undefined || val === "";
-        const unCounted = zoneItems.filter(i => isUncounted(i.initialQty)).length;
-        const unRecounted = zoneItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
-        
-        const btnRandom = document.getElementById('btnModeRandom');
-        const hintEl = document.getElementById('modeStatusHint');
-        let hintTexts = [];
-        
-        if (unCounted > 0 || unRecounted > 0) {
-            btnRandom.disabled = true;
-            if (unCounted > 0) hintTexts.push(`缺 ${unCounted} 初盤`);
-            if (unRecounted > 0) hintTexts.push(`缺 ${unRecounted} 覆核`);
-        } else {
-            btnRandom.disabled = false;
-        }
-        
-        const zStat = zoneStatus[currentActiveZone] || {};
-
-        if (currentCountMode === 'recount' && unCounted > 0) {
-            hintEl.innerHTML = `⚠️ 尚有 ${unCounted} 項未初盤，暫不顯示`;
-            hintEl.style.color = '#d97706';
-        } else if (currentCountMode === 'recount' && !zStat.sign_zoneInitial) {
-            hintEl.innerHTML = `⚠️ 請先完成初盤作業的「負責人簽名」，才能進行覆盤。`;
-            hintEl.style.color = 'var(--ikea-red)';
-        } else if (currentCountMode === 'random' && hintTexts.length > 0) {
-            hintEl.innerHTML = `⚠️ 無法抽盤：${hintTexts.join('、')}`;
-            hintEl.style.color = 'var(--ikea-red)';
-        } else if (currentCountMode === 'random' && !zStat.sign_zoneRecount) {
-            hintEl.innerHTML = `⚠️ 請先完成覆盤作業的「負責人簽名」，才能進行抽盤。`;
-            hintEl.style.color = 'var(--ikea-red)';
-        } else if (hintTexts.length > 0) {
-            hintEl.innerHTML = `📌 抽盤鎖定中：${hintTexts.join('、')}`;
-            hintEl.style.color = 'var(--ikea-gray-dark)';
-        } else {
-            hintEl.innerHTML = `✅ 此階段可正常進行。`;
-            hintEl.style.color = 'var(--ikea-green)';
-        }
-    }
-
-    window.renderZoneDashboard = function() {
-        const activeZonesArray = window.sortZones([...new Set(scannedItems.map(i => i.zone))].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped) && (zoneDepartments[z] || 'SFM') === currentDepartment));
-        window.renderTabs(activeZonesArray, 'dashboardTabsContainer', activeDashboardCategory, 'setDashboardCategory');
-
-        document.querySelectorAll('#dashboardStatusTabsContainer .cat-tab').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.status === activeDashboardStatus);
-        });
-
-        const container = document.getElementById('zoneDashboardContainer'); const statusContainer = document.getElementById('dashboardOverallStatus');
-        if (activeZonesArray.length === 0) { container.innerHTML = "<p style='text-align:center; color:#94a3b8; padding: 20px;'>本部門無需要盤點的區域。</p>"; statusContainer.innerHTML = ""; return; }
-
-        if (activeDashboardCategory === '全部' && activeDashboardStatus === 'all') {
-            let finishedZonesCount = 0; activeZonesArray.forEach(z => { if (window.checkZoneDone(z)) finishedZonesCount++; });
-            if (finishedZonesCount === activeZonesArray.length) { statusContainer.innerHTML = `<div class="overall-status overall-complete">🏆 本部門盤點與簽核皆已完成 (${finishedZonesCount}/${activeZonesArray.length})</div>`; } 
-            else { statusContainer.innerHTML = `<div class="overall-status overall-pending">⏳ 本部門盤點進行中 (${finishedZonesCount}/${activeZonesArray.length} 區)</div>`; }
-        } else { statusContainer.innerHTML = ""; }
-
-        let filteredZones = activeZonesArray;
-        
-        if (activeDashboardCategory !== '全部') {
-            filteredZones = filteredZones.filter(z => window.getZoneCategory(z) === activeDashboardCategory);
-        }
-        
-        if (activeDashboardStatus !== 'all') {
-            filteredZones = filteredZones.filter(z => {
-                const statInfo = window.getZoneStatusDetails(z);
-                if (activeDashboardStatus === 'pending_initial') return statInfo.code === 'pending_initial' || statInfo.code === 'doing_initial' || statInfo.code === 'pending_initial_sign';
-                if (activeDashboardStatus === 'pending_recount') return statInfo.code === 'pending_recount' || statInfo.code === 'pending_recount_sign';
-                if (activeDashboardStatus === 'pending_random') return statInfo.code === 'pending_random' || statInfo.code === 'pending_random_sign';
-                return statInfo.code === activeDashboardStatus;
-            });
-        }
-
-        if (filteredZones.length === 0) { container.innerHTML = `<p style='text-align:center; color:#94a3b8; padding: 20px;'>此篩選條件下無盤區。</p>`; return; }
-
-        container.innerHTML = "";
-        
-        filteredZones.forEach(zone => {
-            const statInfo = window.getZoneStatusDetails(zone);
-            container.insertAdjacentHTML('beforeend', `<button class="zone-btn" onclick="window.openZoneDetail('${zone}')"><span class="zone-btn-title">📍 ${zone}</span><span class="${statInfo.class}">${statInfo.label}</span></button>`);
-        });
-    }
-
-    window.setDashFilter = function(mode) {
-        dashFilterMode = mode;
-        window.renderDashboard();
-    }
-
-    window.renderDashboard = function() {
-        const container = document.getElementById('dashIssuesContainer');
-        const activeZonesArray = window.sortZones([...knownZones].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
-        
-        let totalItems = scannedItems.length;
-        const isUncounted = (val) => val === null || val === undefined || val === "";
-        let countedItems = scannedItems.filter(i => !isUncounted(i.initialQty)).length;
-        
-        let finishedZonesCount = 0;
-        let issuesCount = 0; 
-
-        let pendingHtml = "";
-        let completedHtml = "";
-        let allHtml = "";
-
-        let multipleCorrections = scannedItems.filter(i => i.correctionHistory && i.correctionHistory.length > 1);
-        if (multipleCorrections.length > 0) {
-            let warnHtml = `<h4 style="color:var(--ikea-red); margin-top:8px; border-bottom:1px solid #fecaca; padding-bottom:8px;">🚨 特別注意：多次更正商品</h4>`;
-            multipleCorrections.forEach(i => {
-                issuesCount++;
-                const deptName = (zoneDepartments[i.zone] || 'SFM') === 'REST' ? '🍽️' : '🛒';
-                warnHtml += `<div class="issue-card" style="border-left-color:var(--ikea-red); background:#fef2f2;">
-                    <div class="issue-icon">⚠️</div>
-                    <div class="issue-content" style="width: 100%;">
-                        <h4>[${deptName}超市] 📍 ${i.zone}</h4>
-                        <p style="color:var(--ikea-dark); font-weight:bold;">${i.name}</p>
-                        <p style="color:var(--ikea-red); margin-top: 4px;">已被更正 ${i.correctionHistory.length} 次，請優先查核！</p>
-                    </div>
-                </div>`;
-            });
-            warnHtml += `<h4 style="color:var(--ikea-dark); margin-top:24px; border-bottom:1px solid var(--ikea-border); padding-bottom:8px;">⚠️ 待處理盤區</h4>`;
-            
-            pendingHtml += warnHtml;
-            allHtml += warnHtml;
-        }
-
-        activeZonesArray.forEach(z => {
-            const statInfo = window.getZoneStatusDetails(z);
-            const deptName = (zoneDepartments[z] || 'SFM') === 'REST' ? '🍽️ 餐廳' : '🛒 超市';
-
-            if (statInfo.code === 'completed') {
-                finishedZonesCount++;
-                let cardHtml = `<div class="issue-card" style="border-left-color:var(--ikea-green); background:#eff6ff;">
-                    <div class="issue-icon">✅</div>
-                    <div class="issue-content">
-                        <h4>[${deptName}] ${z}</h4>
-                        <p style="color:var(--ikea-green); font-weight:bold;">已完成驗收</p>
-                    </div>
-                </div>`;
-                completedHtml += cardHtml;
-                allHtml += cardHtml;
-            } else {
-                issuesCount++;
-                const zItems = scannedItems.filter(i => i.zone === z);
-                let reason = [];
-                
-                if (zItems.length === 0) {
-                    reason = ["空盤區無商品"];
-                } else {
-                    const uncounted = zItems.filter(i => isUncounted(i.initialQty)).length;
-                    if (uncounted > 0) reason.push(`缺 ${uncounted} 項初盤`);
-                    
-                    const zStat = zoneStatus[z] || {};
-                    if (!zStat.sign_zoneInitial) reason.push("缺初盤簽名");
-                    if (!zStat.sign_zoneRecount) reason.push("缺覆盤簽名");
-                    if (!zStat.sign_zoneRandom) reason.push("缺抽盤簽名");
-                    
-                    const unRecounted = zItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
-                    if (unRecounted > 0) reason.push(`缺 ${unRecounted} 項覆盤`);
-                    const unRandomed = zItems.filter(i => i.isRandomChecked && !i.randomDone).length;
-                    if (unRandomed > 0) reason.push(`缺 ${unRandomed} 項抽盤`);
-                }
-
-                let cardHtml = `<div class="issue-card">
-                    <div class="issue-icon">📍</div>
-                    <div class="issue-content">
-                        <h4 style="display:flex; justify-content:space-between; align-items:center;">[${deptName}] ${z} <span class="${statInfo.class}" style="font-size:11px; padding:2px 8px;">${statInfo.label}</span></h4>
-                        <p>${reason.join("、")}</p>
-                    </div>
-                </div>`;
-                pendingHtml += cardHtml;
-                allHtml += cardHtml;
-            }
-        });
-
-        const percent = activeZonesArray.length > 0 ? Math.round((finishedZonesCount / activeZonesArray.length) * 100) : 0;
-        document.getElementById('dashTotalPercent').innerText = `${percent}%`;
-        
-        document.getElementById('dashZoneStatsVal').innerText = finishedZonesCount;
-        document.getElementById('dashItemStatsVal').innerText = countedItems;
-        document.getElementById('dashIssuesVal').innerText = issuesCount;
-
-        let etaHtml = "";
-        let remainingItemsToCount = totalItems - countedItems;
-        if (systemStartTime && countedItems > 0 && finishedZonesCount < activeZonesArray.length) {
-            let elapsedMs = Date.now() - systemStartTime;
-            let msPerItem = elapsedMs / countedItems;
-            let msRemaining = msPerItem * remainingItemsToCount;
-            let minsRemaining = Math.max(1, Math.round(msRemaining / 60000));
-            let timeStr = minsRemaining >= 60 ? `${Math.floor(minsRemaining/60)} 小時 ${minsRemaining%60} 分鐘` : `${minsRemaining} 分鐘`;
-            etaHtml = `⏳ 預估剩餘時間：約 ${timeStr}`;
-        } else if (finishedZonesCount === activeZonesArray.length && activeZonesArray.length > 0) {
-            etaHtml = `✅ 盤點已全數完成！`;
-        } else {
-            etaHtml = `⏳ 預估時間：完成首項後計算`;
-        }
-        document.getElementById('dashETA').innerText = etaHtml;
-
-        document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active-filter'));
-        if(dashFilterMode === 'all') {
-            document.getElementById('cardDashAll').classList.add('active-filter');
-            document.getElementById('dashIssuesTitle').innerText = '📋 全館盤區狀態總覽';
-        } else if(dashFilterMode === 'completed') {
-            document.getElementById('cardDashCompleted').classList.add('active-filter');
-            document.getElementById('dashIssuesTitle').innerText = '✅ 已驗收盤區清單';
-        } else {
-            document.getElementById('cardDashPending').classList.add('active-filter');
-            document.getElementById('dashIssuesTitle').innerText = '⚠️ 待處理清單 (未完成)';
-        }
-
-        let finalHtml = "";
-        if (dashFilterMode === 'all') finalHtml = allHtml || "<p style='text-align:center; color:#94a3b8; padding: 20px;'>目前尚無任何資料。</p>";
-        else if (dashFilterMode === 'completed') finalHtml = completedHtml || "<p style='text-align:center; color:#94a3b8; padding: 20px;'>目前尚無已驗收完成的盤區。</p>";
-        else finalHtml = pendingHtml || "<div style='text-align:center; color:var(--ikea-green); background:#eff6ff; padding:24px; border-radius:12px; font-weight:700; border: 1px solid #dbeafe;'>🏆 恭喜！全館盤區皆已嚴謹驗收完成！</div>";
-
-        document.getElementById('dashIssuesContainer').innerHTML = finalHtml;
-    }
-
-    window.exportToExcel = function() {
-        if (scannedItems.length === 0) { alert("目前沒有盤點資料可供匯出！"); return; }
-        
-        const isUncounted = (val) => val === null || val === undefined || val === "";
-        let incompleteZones = [];
-        const activeZones = window.sortZones([...new Set(scannedItems.map(i=>i.zone))].filter(z => !(zoneStatus[z] && zoneStatus[z].isSkipped)));
-        
-        activeZones.forEach(z => {
-            if(!window.checkZoneDone(z)) {
-                const zItems = scannedItems.filter(i => i.zone === z);
-                let reason = [];
-                if (zItems.length === 0) {
-                    reason.push("無商品");
-                } else {
-                    const uncounted = zItems.filter(i => isUncounted(i.initialQty)).length;
-                    if (uncounted > 0) reason.push(`缺 ${uncounted} 項初盤`);
-                    const zStat = zoneStatus[z] || {};
-                    if (!zStat.sign_zoneInitial || !zStat.sign_zoneRecount || !zStat.sign_zoneRandom) reason.push(`負責人未簽齊`);
-                    const unRecounted = zItems.filter(i => !isUncounted(i.initialQty) && !i.recountDone).length;
-                    if (unRecounted > 0) reason.push(`缺 ${unRecounted} 項覆盤`);
-                    const unRandomed = zItems.filter(i => i.isRandomChecked && !i.randomDone).length;
-                    if (unRandomed > 0) reason.push(`缺 ${unRandomed} 項抽盤`);
-                }
-                incompleteZones.push(`[${z}] ${reason.join("、")}`);
-            }
-        });
-
-        if (incompleteZones.length > 0) {
-            const confirmMsg = "⚠️ 警告：全館盤點尚有未完成的項目，確定要強制結算匯出嗎？\n\n未完成範例：\n" + incompleteZones.slice(0, 5).join("\n") + (incompleteZones.length > 5 ? "\n...等" : "");
-            if(!confirm(confirmMsg)) return;
-        }
-
-        const exportData = scannedItems.map(item => {
-            const zStat = zoneStatus[item.zone] || {};
-            const initialQtyStr = !isUncounted(item.initialQty) ? parseFloat(item.initialQty) : "未盤";
-            return {
-                "盤區": item.zone,
-                "貨號": item.code,
-                "品名": item.name,
-                "單位": item.unit,
-                "初盤數量": initialQtyStr,
-                "更正次數": (item.correctionHistory ? item.correctionHistory.length : 0),
-                "初盤人員": item.initialOperator || "未紀錄", 
-                "覆盤負責人": item.recountOperator || "未紀錄",
-                "抽盤負責人": item.randomOperator || "未紀錄",
-                "抽盤對象": item.isRandomChecked ? "是" : "否",
-                "盤區初盤簽核": zStat.sign_zoneInitial ? "已簽" : "未簽", "盤區覆盤簽核": zStat.sign_zoneRecount ? "已簽" : "未簽", "盤區抽盤簽核": zStat.sign_zoneRandom ? "已簽" : "未簽"
-            };
-        });
-        const ws = XLSX.utils.json_to_sheet(exportData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "盤點結算");
-        XLSX.writeFile(wb, `全館盤點結算_${currentInventoryMonth}.xlsx`);
-        
-        setTimeout(() => {
-            if(confirm("✅ 結算 Excel 已下載！\n請問是否要將本次全館盤點資料【封存至歷史紀錄】，並清空清單以準備次月作業？")) {
-                let monthStr; let isUnique = false;
-                while (!isUnique) {
-                    monthStr = prompt("請設定本次封存的月份名稱 (預設為當前月份)", currentInventoryMonth);
-                    if (monthStr === null) return; 
-                    if (inventoryHistory.some(h => h.month === monthStr)) { alert("❌ 此月份名稱已存在！請輸入不同的名稱避免覆蓋。"); } else { isUnique = true; }
-                }
-
-                inventoryHistory.push({
-                    month: monthStr, timestamp: new Date().toLocaleString('zh-TW'),
-                    items: JSON.parse(JSON.stringify(scannedItems)), zoneStatus: JSON.parse(JSON.stringify(zoneStatus)),
-                    zoneDepartments: JSON.parse(JSON.stringify(zoneDepartments))
-                });
-
-                scannedItems = []; systemStartTime = null; window.buildZoneCategoryCache();
-                for(let z in zoneStatus) { zoneStatus[z] = { isSkipped: false, sign_zoneInitial: null, sign_zoneRecount: null, sign_zoneRandom: null }; }
-                
-                set(ref(db, `sfm_inventory_history_${currentStore}`), inventoryHistory).then(()=>{
-                    syncToFirebase(); window.renderCreateListTable(); alert("✅ 封存成功！系統已重置。");
-                }).catch((err)=>{ alert("⚠️ 封存失敗，已暫存於本機，請檢查網路連線。"); console.error(err); });
-            }
-        }, 1000);
-    }
-
-    window.renderHistoryList = function() {
-        document.getElementById('historyListView').classList.remove('hidden'); document.getElementById('historyDetailView').classList.add('hidden');
-        const container = document.getElementById('historyListContainer');
-        if(inventoryHistory.length === 0) { container.innerHTML = "<p style='text-align:center; color:#888; padding:20px;'>目前尚未有任何歷史盤點紀錄。</p>"; return; }
-        let html = '';
-        [...inventoryHistory].reverse().forEach((record, index) => {
-            const originalIndex = inventoryHistory.length - 1 - index;
-            html += `<button class="zone-btn" onclick="window.viewHistoryDetail(${originalIndex})">
-                    <span class="zone-btn-title">📅 ${record.month} 全館盤點明細</span>
-                    <span class="zone-badge">共 ${record.items.length} 項</span></button>`;
-        });
-        container.innerHTML = html;
-        window.updateHeaderBackButton();
-    }
-
-    window.viewHistoryDetail = function(index) {
-        const record = inventoryHistory[index];
-        document.getElementById('historyListView').classList.add('hidden'); document.getElementById('historyDetailView').classList.remove('hidden');
-        document.getElementById('historyDetailTitle').innerText = `${record.month} 盤點明細`;
-        document.getElementById('btnDeleteHistory').onclick = function() { window.deleteHistoryRecord(index); };
-
-        const tableBody = document.getElementById('historyDetailTableBody'); let html = '';
-        const sortedItems = [...record.items].sort((a, b) => a.zone.localeCompare(b.zone));
-        const isUncounted = (val) => val === null || val === undefined || val === "";
-
-        sortedItems.forEach(item => { 
-            const deptName = (record.zoneDepartments && record.zoneDepartments[item.zone] === 'REST') ? '餐廳' : '超市';
-            const qtyStr = !isUncounted(item.initialQty) ? item.initialQty : '-';
-            html += `<tr><td style="color:#64748b; font-size:12px;">${deptName}</td><td style="font-weight:700; color:var(--ikea-blue);">${item.zone}</td><td style="font-family:monospace; color:#888;">${item.code}</td><td>${item.name}</td><td style="text-align:center; font-weight:700; font-size:16px;">${qtyStr}</td></tr>`; 
-        });
-        tableBody.innerHTML = html;
-
-        const sigContainer = document.getElementById('historySignatures');
-        let sigHtml = '<h4 style="color:var(--ikea-dark);">📝 盤區簽核紀錄</h4><div style="display:flex; flex-wrap:wrap; gap:12px;">';
-        if (record.zoneStatus) {
-            for (let z in record.zoneStatus) {
-                const zStat = record.zoneStatus[z];
-                if (zStat.sign_zoneInitial || zStat.sign_zoneRecount || zStat.sign_zoneRandom) {
-                    sigHtml += `<div style="background:var(--ikea-white); padding:12px; border-radius:8px; border:1px solid var(--ikea-border); min-width:120px;">
-                        <strong style="display:block; margin-bottom:8px; color:var(--ikea-dark); border-bottom:1px solid #eee; padding-bottom:4px;">${z}</strong>
-                        ${zStat.sign_zoneInitial ? `<img src="${zStat.sign_zoneInitial}" style="height:30px; display:block; margin-bottom:4px;" title="初盤">` : ''}
-                        ${zStat.sign_zoneRecount ? `<img src="${zStat.sign_zoneRecount}" style="height:30px; display:block; margin-bottom:4px;" title="覆盤">` : ''}
-                        ${zStat.sign_zoneRandom ? `<img src="${zStat.sign_zoneRandom}" style="height:30px; display:block;" title="抽盤">` : ''}
-                    </div>`;
-                }
-            }
-        }
-        sigHtml += '</div>'; sigContainer.innerHTML = sigHtml;
-        window.updateHeaderBackButton();
-    }
-
-    window.deleteHistoryRecord = function(index) {
-        if(confirm("⚠️ 警告：確定要永久刪除這筆歷史紀錄嗎？刪除後無法復原。")) {
-            inventoryHistory.splice(index, 1); 
-            localStorage.setItem('inventory_history', JSON.stringify(inventoryHistory));
-            set(ref(db, `sfm_inventory_history_${currentStore}`), inventoryHistory)
-                .then(() => { window.backToHistoryList(); window.renderHistoryList(); })
-                .catch((err) => { alert("⚠️ 刪除失敗，請檢查網路連線後再試一次。"); console.error(err); });
-        }
-    }
-    
-    window.backToHistoryList = function() { 
-        document.getElementById('historyListView').classList.remove('hidden'); 
-        document.getElementById('historyDetailView').classList.add('hidden'); 
-        window.updateHeaderBackButton();
-    }
-
     window.handleFileUpload = function(event) {
         const file = event.target.files[0]; 
         if (!file) return;
+
+        if (scannedItems.length > 0) {
+            if (!confirm("⚠️ 系統內已經有盤點資料！\n\n再次匯入會將新商品「附加」在現有清單後，可能會造成同分頁商品重複。\n\n確定要繼續匯入嗎？\n(若要重新匯入全新名單，請先按「取消」，並在首頁點選「清空當前盤單」)")) {
+                event.target.value = ''; 
+                return;
+            }
+        }
+
         const shouldImportItems = document.getElementById('importItemsCheckbox').checked;
 
         const syncText = document.getElementById('syncText');
@@ -1647,11 +1254,10 @@
         const reader = new FileReader();
         
         reader.onload = function(e) {
-          setTimeout(() => { // 讓瀏覽器先重繪「解析中」提示，避免使用者以為畫面卡死
+          setTimeout(() => { 
             try {
                 const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
                 
-                // 🌟 修改 1：忽略大小寫尋找 SETTING 工作表
                 const settingSheetName = workbook.SheetNames.find(n => n.toUpperCase() === 'SETTING');
                 if (settingSheetName && workbook.Sheets[settingSheetName]) {
                     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[settingSheetName], { header: 1 });
@@ -1662,7 +1268,7 @@
                             productDatabase[safeCode] = { 
                                 name: rows[i][1] ? String(rows[i][1]).trim() : "未知名稱", 
                                 unit: rows[i][2] ? String(rows[i][2]).trim() : "PC",
-                                cost: rows[i][5] ? (parseFloat(rows[i][5]) || 0) : 0 // F欄：成本
+                                cost: rows[i][5] ? (parseFloat(rows[i][5]) || 0) : 0
                             };
                         }
                     }
@@ -1671,11 +1277,11 @@
                 let importedItemsCount = 0;
                 let sfmImportedZones = [];
                 let restImportedZones = [];
+                scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
 
                 workbook.SheetNames.forEach(originalSheetName => {
                     const lowerSheetName = String(originalSheetName).toLowerCase();
                     
-                    // 🌟 修改 2：排除特定系統用分頁 (包含小寫的 setting)
                     if (!['setting', 'display bin', '工作表1', '工作表2'].includes(lowerSheetName)) {
                         
                         const safeSheetName = String(originalSheetName).replace(/[\.#$\[\]\/]/g, '_');
@@ -1700,11 +1306,10 @@
 
                         if (shouldImportItems) {
                             const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[originalSheetName], { header: 1 });
-                            let headerIdx = -1; let itemColIdx = -1; let nameColIdx = -1; let noteColIdx = -1;
+                            let headerIdx = -1; let itemColIdx = -1; let nameColIdx = -1; let noteColIdx = -1; let unitColIdx = -1;
                             
                             for (let r = 0; r < sheetData.length; r++) {
                                 if (sheetData[r]) {
-                                    // 🌟 修改 3：嚴格雙重驗證：必須同時找到「貨號/條碼」與「品名」，才認定為標題列
                                     let tempItemIdx = sheetData[r].findIndex(cell => { 
                                         if(cell === null || cell === undefined) return false;
                                         const s = String(cell); 
@@ -1723,6 +1328,10 @@
                                             if(cell === null || cell === undefined) return false;
                                             return String(cell).includes("備註");
                                         }); 
+                                        unitColIdx = sheetData[r].findIndex(cell => {
+                                            if(cell === null || cell === undefined) return false;
+                                            return String(cell).includes("單位");
+                                        });
                                         break; 
                                     }
                                 }
@@ -1736,9 +1345,13 @@
                                         if (rawCode && rawCode !== "NaN" && rawCode !== "undefined") {
                                             const safeCode = rawCode.replace(/[\.#$\[\]\/]/g, '_');
                                             const dbInfo = productDatabase[safeCode];
+                                            
                                             const rawName = row[nameColIdx] ? String(row[nameColIdx]).trim() : "";
-                                            const name = dbInfo ? dbInfo.name : ((rawName && !rawName.startsWith('#')) ? rawName : "未知名稱"); // Excel 公式錯誤值(#N/A)視為查無品名
-                                            const unit = dbInfo ? dbInfo.unit : "PC";
+                                            const name = dbInfo ? dbInfo.name : ((rawName && !rawName.startsWith('#')) ? rawName : "未知名稱"); 
+                                            
+                                            const rawUnit = (unitColIdx !== -1 && row[unitColIdx]) ? String(row[unitColIdx]).trim() : "";
+                                            const unit = dbInfo ? dbInfo.unit : ((rawUnit && !rawUnit.startsWith('#')) ? rawUnit : "PC");
+                                            
                                             const note = (noteColIdx !== -1 && row[noteColIdx]) ? String(row[noteColIdx]).trim() : "";
                                             
                                             scannedItems.push({ 
@@ -1841,17 +1454,23 @@
     window.cancelManualItem = function() { document.getElementById('manualAddSection').classList.add('hidden'); }
 
     window.addToInventoryList = function(code, name, unit, zone, initialQty = "") {
+        scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
         scannedItems.push({ id: window.generateUUID(), code: code, name: name, unit: unit, zone: zone, initialQty: initialQty, isRandomChecked: false, recountDone: false, randomDone: false, correctionHistory: [] });
         syncToFirebase(); window.renderCreateListTable(); window.renderZoneChecklist(); 
     }
 
     window.deleteItem = function(itemId) {
-        if(confirm("確定要將這個商品從清單中刪除嗎？")) { scannedItems = scannedItems.filter(item => item.id !== itemId); syncToFirebase(); window.renderCreateListTable(); window.renderZoneChecklist(); }
+        if(confirm("確定要將這個商品從清單中刪除嗎？")) { 
+            scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
+            scannedItems = scannedItems.filter(item => item.id !== itemId); 
+            syncToFirebase(); window.renderCreateListTable(); window.renderZoneChecklist(); 
+        }
     }
 
     window.renderCreateListTable = function() {
         const tableBody = document.getElementById('tableBody'); tableBody.innerHTML = "";
         const currentZone = document.getElementById('zoneInput').value.trim();
+        scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
         const filteredItems = currentZone ? scannedItems.filter(item => item.zone === currentZone) : [];
         const table = document.getElementById('inventoryTable'); const emptyMsg = document.getElementById('emptyTableMsg');
 
@@ -1939,6 +1558,7 @@
     }
 
     window.processCountScan = function(code) {
+        scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
         let itemsInZone = scannedItems.filter(i => i.zone === currentActiveZone && i.code === code);
         const isUncounted = (val) => val === null || val === undefined || val === "";
 
@@ -1998,6 +1618,7 @@
         const actualQty = parseFloat(document.getElementById('verifyScanActual').value);
         if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的數量！"); return; }
         
+        scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
         const item = scannedItems.find(i => i.id === window.verifyItemId);
         if (!item) {
             alert("⚠️ 找不到該商品，可能已被其他裝置刪除，請重新整理後再試。");
@@ -2031,6 +1652,7 @@
         const actualQty = parseFloat(actualInput);
         if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的數量！"); return; }
         
+        scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
         const item = scannedItems.find(i => i.id === itemId);
         if (!item) { alert("⚠️ 找不到該商品，可能已被其他裝置刪除，請重新整理後再試。"); return; }
         
@@ -2100,9 +1722,8 @@
         });
     }
 
-    // === 🔒 職責分離檢查：確保初盤／覆盤／抽盤不會是同一人 ===
     function checkOperatorSeparation(item, mode) {
-        if (!currentUser) return true; // 尚未設定操作員姓名時，無從比對，不擋
+        if (!currentUser) return true;
         if (mode === 'recount') {
             if (item.initialOperator && item.initialOperator === currentUser) {
                 alert(`⚠️ 職責分離限制：初盤與覆盤不可為同一人！\n\n此商品初盤人員為「${item.initialOperator}」，請更換操作員後再進行覆盤。`);
@@ -2134,8 +1755,14 @@
     }
 
     window.renderZoneItems = function() {
+        if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'number') {
+            return;
+        }
+
         const container = document.getElementById('inventoryListContainer'); container.innerHTML = ""; let renderedCount = 0;
         const isUncounted = (val) => val === null || val === undefined || val === "";
+        
+        scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
 
         scannedItems.filter(item => item.zone === currentActiveZone).forEach(item => {
             if ((currentCountMode === 'recount' || currentCountMode === 'random') && isUncounted(item.initialQty)) return;
@@ -2250,6 +1877,7 @@
 
     window.updateQty = function(itemId, overrideVal = null) {
         const inputVal = overrideVal !== null ? overrideVal : document.getElementById(`qty-${itemId}`).value;
+        scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
         const itemIndex = scannedItems.findIndex(i => i.id === itemId);
         if(itemIndex > -1) { 
             scannedItems[itemIndex].initialQty = parseFloat(inputVal) < 0 ? 0 : inputVal; 
@@ -2263,11 +1891,11 @@
 
     window.setCountMode = function(mode) {
         if (mode === 'random' && currentActiveZone) {
+            scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
             const zoneItems = scannedItems.filter(i => i.zone === currentActiveZone);
             if (!zoneItems.some(i => i.isRandomChecked) && zoneItems.length > 0) {
                 const pickCount = Math.ceil(zoneItems.length / 3);
 
-                // 依優先序排序：① 成本高 → ② 初/複盤曾有異常更正 → ③ 盤點數量大
                 const sortedItems = [...zoneItems].sort((a, b) => {
                     const costA = (productDatabase[a.code] && productDatabase[a.code].cost) || 0;
                     const costB = (productDatabase[b.code] && productDatabase[b.code].cost) || 0;
@@ -2316,6 +1944,7 @@
         const code = rawCode.replace(/[\.#$\[\]\/]/g, '_');
         productDatabase[code] = { name: name, unit: unit }; 
         
+        scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
         scannedItems.push({ id: window.generateUUID(), code: code, name: name, unit: unit, zone: currentActiveZone, initialQty: qty, initialOperator: currentUser, isRandomChecked: false, recountDone: false, randomDone: false, correctionHistory: [] });
         
         if (!systemStartTime) systemStartTime = Date.now();
@@ -2371,6 +2000,7 @@
     }
     
     window.applySignature = function(imgData) { 
+        scannedItems = Array.isArray(scannedItems) ? scannedItems : Object.values(scannedItems);
         if (currentSignContext.type === 'item') {
             const item = scannedItems.find(i => i.id === currentSignContext.targetId);
             if (item) {
@@ -2398,10 +2028,6 @@
             zoneStatus[currentActiveZone][signKey] = imgData; syncToFirebase(); window.renderZoneSignatures(); 
         }
     }
-    
-    window.addEventListener('load', function() {
-        if (knownZones.size > 0) window.renderQuickZoneButtons();
-    });
 </script>
 </body>
 </html>
