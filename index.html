@@ -136,7 +136,7 @@
         .zone-btn:hover { border-color: var(--ikea-blue); }
         .zone-btn-title { font-size: 16px; font-weight: 700; color: var(--ikea-dark); }
         
-        /* 狀態顏色標籤（收斂為柔和色調，降低視覺雜訊） */
+        /* 狀態顏色標籤 */
         .zone-badge-grey { background: var(--ikea-gray-light); color: #6b6b64; font-size: 13px; padding: 6px 12px; border-radius: 20px; font-weight: 500; }
         .zone-badge-red { background: #fdf2f1; color: var(--ikea-red); font-size: 13px; padding: 6px 12px; border-radius: 20px; font-weight: 700; }
         .zone-badge-orange { background: #fdf6ec; color: #b3690e; font-size: 13px; padding: 6px 12px; border-radius: 20px; font-weight: 700; }
@@ -686,6 +686,7 @@
         }
     });
 
+    // === 🔄 差異式同步：只寫入「有變動的項目」，避免多人同時操作時互相覆蓋 ===
     let remoteSnap = { loaded: false, itemsLegacy: false, zonesLegacy: false, items: {}, zoneStatus: {}, zoneDepartments: {}, productDatabase: {}, knownZones: {}, month: null, start: null };
     let seqCounter = 0;
     function nextSeq() { seqCounter = (seqCounter + 1) % 1000; return Date.now() * 1000 + seqCounter; }
@@ -751,6 +752,7 @@
         return updates;
     }
 
+    // === ⌨️ 輸入中不重繪：避免別人同步進來時，把正在輸入的數字洗掉 ===
     let uiRenderDeferred = false;
     function isEditingListInput() {
         const ae = document.activeElement;
@@ -1862,17 +1864,6 @@
         }
         
         window.updateModeUI(); 
-    }
-
-    window.triggerManualCorrection = function(itemId) {
-        const inputVal = document.getElementById(`manualVerifyInput-${itemId}`).value;
-        const actualQty = parseFloat(inputVal);
-        if (isNaN(actualQty) || actualQty < 0) { alert("請輸入有效的正確數量！"); return; }
-        const item = scannedItems.find(i => i.id === itemId);
-        if (item && !checkOperatorSeparation(item, currentCountMode)) return;
-        window.pendingCorrectionQty = actualQty;
-        window.isVerifying = true; 
-        window.openSignaturePad(itemId, 'item');
     }
 
     window.updateQty = function(itemId, overrideVal = null) {
