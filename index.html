@@ -503,7 +503,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyC4Yu58CX40ybgNeHB-HepYxLga1bIYZpA",
@@ -674,89 +674,6 @@
     });
 
     // === 🏪 多店分離與 Firebase 連線機制 ===
-    // >>> SYNC-DIFF-BEGIN
-    // === 🔄 差異式同步：只寫入「有變動的項目」，避免多人同時操作時互相覆蓋 ===
-    let remoteSnap = { loaded: false, itemsLegacy: false, zonesLegacy: false, items: {}, zoneStatus: {}, zoneDepartments: {}, productDatabase: {}, knownZones: {}, month: null, start: null };
-    let seqCounter = 0;
-    function nextSeq() { seqCounter = (seqCounter + 1) % 1000; return Date.now() * 1000 + seqCounter; }
-    function stableStringify(v) {
-        if (v === null || v === undefined) return 'null';
-        if (typeof v !== 'object') return JSON.stringify(v);
-        if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
-        const keys = Object.keys(v).sort().filter(k => {
-            const x = v[k];
-            if (x === null || x === undefined) return false;                          // Firebase 不存 null
-            if (Array.isArray(x) && x.length === 0) return false;                      // 也不存空陣列
-            if (typeof x === 'object' && !Array.isArray(x) && Object.keys(x).length === 0) return false;
-            return true;
-        });
-        return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(v[k])).join(',') + '}';
-    }
-    function cleanForFirebase(v) { return JSON.parse(JSON.stringify(v)); }
-    function mapStr(o) { const r = {}; Object.keys(o || {}).forEach(k => { r[k] = stableStringify(o[k]); }); return r; }
-
-    function captureRemoteSnap(data, itemList, zoneList) {
-        remoteSnap = {
-            loaded: true,
-            itemsLegacy: Array.isArray(data.scannedItems),
-            zonesLegacy: Array.isArray(data.knownZones),
-            items: Object.fromEntries(itemList.map(it => [it.id, stableStringify(it)])),
-            zoneStatus: mapStr(data.zoneStatus),
-            zoneDepartments: mapStr(data.zoneDepartments),
-            productDatabase: mapStr(data.productDatabase),
-            knownZones: Object.fromEntries(zoneList.map(z => [z, true])),
-            month: data.currentInventoryMonth ?? null,
-            start: data.systemStartTime ?? null
-        };
-    }
-
-    function buildSyncUpdates(local, snap) {
-        const updates = {};
-        if ((local.month ?? null) !== snap.month) updates['currentInventoryMonth'] = local.month ?? null;
-        if ((local.start ?? null) !== snap.start) updates['systemStartTime'] = local.start ?? null;
-
-        // 商品：每一筆各自一個路徑（以 id 為 key）
-        local.items.forEach(it => { if (it.seq === undefined || it.seq === null) it.seq = nextSeq(); });
-        const localMap = {}; local.items.forEach(it => { localMap[it.id] = it; });
-        if (snap.itemsLegacy) {
-            const whole = {}; local.items.forEach(it => { whole[it.id] = cleanForFirebase(it); });
-            updates['scannedItems'] = Object.keys(whole).length ? whole : null;   // 舊格式(陣列)一次性轉換
-        } else {
-            Object.keys(localMap).forEach(id => { if (snap.items[id] !== stableStringify(localMap[id])) updates['scannedItems/' + id] = cleanForFirebase(localMap[id]); });
-            Object.keys(snap.items).forEach(id => { if (!(id in localMap)) updates['scannedItems/' + id] = null; });
-        }
-
-        // 以名稱為 key 的資料：逐筆比對
-        ['zoneStatus', 'zoneDepartments', 'productDatabase'].forEach(name => {
-            const lm = local[name] || {}; const sm = snap[name] || {};
-            Object.keys(lm).forEach(k => { if (k && sm[k] !== stableStringify(lm[k])) updates[name + '/' + k] = cleanForFirebase(lm[k]); });
-            Object.keys(sm).forEach(k => { if (!(k in lm)) updates[name + '/' + k] = null; });
-        });
-
-        // 盤區清單
-        const lz = [...local.knownZones].filter(z => z);
-        if (snap.zonesLegacy) { const o = {}; lz.forEach(z => { o[z] = true; }); updates['knownZones'] = lz.length ? o : null; }
-        else {
-            lz.forEach(z => { if (!snap.knownZones[z]) updates['knownZones/' + z] = true; });
-            Object.keys(snap.knownZones).forEach(z => { if (!lz.includes(z)) updates['knownZones/' + z] = null; });
-        }
-        return updates;
-    }
-    // <<< SYNC-DIFF-END
-
-    // === ⌨️ 輸入中不重繪：避免別人同步進來時，把正在輸入的數字洗掉 ===
-    let uiRenderDeferred = false;
-    function isEditingListInput() {
-        const ae = document.activeElement;
-        if (!ae || (ae.tagName !== 'INPUT' && ae.tagName !== 'TEXTAREA')) return false;
-        if (ae.tagName === 'INPUT' && !['number', 'text', 'tel', 'search'].includes(ae.type)) return false;
-        return !!ae.closest('#inventoryListContainer, #zoneChecklistContainer, #zoneDashboardContainer');
-    }
-    document.addEventListener('focusout', () => {
-        if (!uiRenderDeferred) return;
-        setTimeout(() => { if (!isEditingListInput()) { uiRenderDeferred = false; updateUI(); } }, 250);
-    });
-
     function initFirebaseListeners() {
         if (!currentStore) return; 
         
@@ -769,23 +686,15 @@
                 currentInventoryMonth = data.currentInventoryMonth || new Date().toISOString().slice(0, 7);
                 zoneDepartments = data.zoneDepartments || {};
                 productDatabase = data.productDatabase || {};
-                const zoneList = Array.isArray(data.knownZones) ? data.knownZones.filter(Boolean) : Object.keys(data.knownZones || {});
-                knownZones = new Set(zoneList);
-                let itemList;
-                if (Array.isArray(data.scannedItems)) itemList = data.scannedItems.filter(Boolean).map((it, i) => { if (it.seq === undefined) it.seq = i + 1; return it; });  // 舊格式
-                else if (data.scannedItems && typeof data.scannedItems === 'object') itemList = Object.values(data.scannedItems);
-                else itemList = [];
-                itemList.sort((a, b) => (a.seq || 0) - (b.seq || 0));
-                itemList.forEach(item => { if (!item.correctionHistory) item.correctionHistory = []; });
-                scannedItems = itemList;
+                knownZones = new Set(data.knownZones || []);
+                scannedItems = data.scannedItems || [];
+                scannedItems.forEach(item => { if (!item.correctionHistory) item.correctionHistory = []; });
                 zoneStatus = data.zoneStatus || {};
                 systemStartTime = data.systemStartTime || null;
-                captureRemoteSnap(data, itemList, zoneList);
                 savePersistedDataLocalOnly();
                 window.buildZoneCategoryCache(); 
                 updateUI();
             } else {
-                captureRemoteSnap({}, [], []);
                 if (scannedItems.length > 0 || knownZones.size > 0) syncToFirebase(); 
             }
             isFirstLoad = false;
@@ -805,7 +714,6 @@
     function updateUI() {
         window.updateHeaderMonth();
         if (!isFirstLoad) {
-            if (isEditingListInput()) { uiRenderDeferred = true; return; }
             if (!document.getElementById('tab-create').classList.contains('hidden')) { window.renderZoneChecklist(); window.renderCreateListTable(); window.renderQuickZoneButtons(); }
             if (!document.getElementById('tab-count').classList.contains('hidden')) {
                 if (currentActiveZone) { window.renderZoneItems(); window.renderZoneSignatures(); } else { window.renderZoneDashboard(); }
@@ -865,29 +773,12 @@
         savePersistedDataLocalOnly(); 
         if (!currentStore) return Promise.resolve();
         const syncDot = document.querySelector('.sync-dot'); const syncText = document.getElementById('syncText');
-        if (!remoteSnap.loaded) { syncText.innerText = "等待雲端資料載入…"; return Promise.resolve(); } // 尚未取得雲端現況前不寫入，避免用不完整資料覆蓋別人
-
-        let updates;
-        try {
-            updates = buildSyncUpdates({ month: currentInventoryMonth, start: systemStartTime, items: scannedItems, zoneStatus, zoneDepartments, productDatabase, knownZones }, remoteSnap);
-        } catch (e) {
-            console.error("同步資料整理失敗:", e);
-            syncText.innerText = "⚠️ 資料格式錯誤"; syncDot.style.backgroundColor = "var(--ikea-red)";
-            return Promise.resolve();
-        }
-        if (Object.keys(updates).length === 0) return Promise.resolve();   // 沒有變動就不寫入
-
         syncText.innerText = "同步中..."; syncDot.style.backgroundColor = "var(--ikea-yellow)";
 
         let isResolved = false;
-        let syncPromise;
-        try {
-            syncPromise = update(ref(db, `sfm_inventory_sync_${currentStore}`), updates);   // 只寫入有變動的路徑
-        } catch (e) {
-            console.error("同步寫入失敗:", e);
-            syncText.innerText = "⚠️ 資料格式錯誤"; syncDot.style.backgroundColor = "var(--ikea-red)";
-            return Promise.resolve();
-        }
+        const syncPromise = set(ref(db, `sfm_inventory_sync_${currentStore}`), {
+            currentInventoryMonth, zoneDepartments, productDatabase, knownZones: [...knownZones], scannedItems, zoneStatus, systemStartTime
+        });
 
         syncPromise.then(() => {
             isResolved = true;
